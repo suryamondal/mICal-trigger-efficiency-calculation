@@ -22,4 +22,4 @@ g++ -c Dict.cc  `root-config --cflags`
 
 g++ -c SNM.C  `root-config --cflags`
 
-g++ `root-config --cflags` -o alignment INOEventdict.o INOManagerdict.o SNMdict.o SNM.o Dict.o alignment.cpp `root-config --glibs`
+g++ `root-config --cflags` -o alignment.o INOEventdict.o INOManagerdict.o SNMdict.o SNM.o Dict.o alignment.cpp `root-config --glibs`
