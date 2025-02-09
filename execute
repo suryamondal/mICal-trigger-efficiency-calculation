@@ -1,0 +1,25 @@
+#!/bin/bash
+
+rm SNMdict.cxx
+rm SNMdict_rdict.pcm
+rootcint SNMdict.cxx -c SNM.h
+
+rm INOEventdict.cxx
+rm INOEventdict_rdict.pcm
+rootcint INOEventdict.cxx -c INOEvent.h
+
+rm INOManagerdict.cxx
+rm INOManagerdict_rdict.pcm
+rootcint INOManagerdict.cxx -c INOManager.h
+
+g++ -c SNMdict.cxx `root-config --cflags`  
+g++ -c INOEventdict.cxx `root-config --cflags`  
+g++ -c INOManagerdict.cxx `root-config --cflags`  
+
+rm Dict_rdict.pcm
+rootcint -f Dict.cc -c -I. -Wall -Wno-deprecated LinkDef.h
+g++ -c Dict.cc  `root-config --cflags` 
+
+g++ -c SNM.C  `root-config --cflags`
+
+g++ `root-config --cflags` -o alignment INOEventdict.o INOManagerdict.o SNMdict.o SNM.o Dict.o alignment.cpp `root-config --glibs`
