@@ -222,8 +222,8 @@ namespace INO {
       timeCalibration[stripId] = time;
     }
 
-    // Setter for time calibration
-    double getTimeCalibration(const StripId& stripId, double time) const {
+    // Getter for time calibration
+    double getTimeCalibration(const StripId& stripId) const {
       if (timeCalibration.count(stripId)) {
         auto it = timeCalibration.find(stripId);
         return it->second;
@@ -233,7 +233,7 @@ namespace INO {
 
   private:
     std::map<StripId, Hit> rawHits;
-    std::map<TDCId, std::vector<double>> rawTDCs[2]; /* 8 TDCs per side, both leading and trailing */
+    std::map<TDCId, std::vector<double>> rawTDCs[2]; /* leading and trailing */
     std::map<StripId, double> timeCalibration;
     double eventTime;
     double lowestCalibratedLeadingTime;
