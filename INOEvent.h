@@ -6,6 +6,7 @@
 #include <limits>
 #include <optional>
 #include <iostream>
+#include <cmath>
 
 namespace INO {
 
@@ -17,7 +18,7 @@ namespace INO {
     // Define operator< for map key comparison
     bool operator<(const LayerId& other) const {
       return std::tie(module, row, column, layer) < 
-	std::tie(other.module, other.row, other.column, other.layer);
+        std::tie(other.module, other.row, other.column, other.layer);
     }
   };
 
@@ -31,7 +32,7 @@ namespace INO {
     // Define operator< for map key comparison
     bool operator<(const TDCId& other) const {
       return std::tie(module, row, column, layer, side, tdc) < 
-	std::tie(other.module, other.row, other.column, other.layer, other.side, other.tdc);
+        std::tie(other.module, other.row, other.column, other.layer, other.side, other.tdc);
     }
   };
 
@@ -44,11 +45,11 @@ namespace INO {
     // Define operator< for map key comparison
     bool operator<(const SideId& other) const {
       return std::tie(module, row, column, layer, side) < 
-	std::tie(other.module, other.row, other.column, other.layer, other.side);
+        std::tie(other.module, other.row, other.column, other.layer, other.side);
     }
   };
 
-  struct HitId {
+  struct StripId {
     int module;
     int row;
     int column;
@@ -56,14 +57,14 @@ namespace INO {
     int side;
     int strip;
     // Define operator< for map key comparison
-    bool operator<(const HitId& other) const {
+    bool operator<(const StripId& other) const {
       return std::tie(module, row, column, layer, side, strip) < 
-	std::tie(other.module, other.row, other.column, other.layer, other.side, other.strip);
+        std::tie(other.module, other.row, other.column, other.layer, other.side, other.strip);
     }
   };
 
   struct Hit {
-    HitId hitId;
+    StripId stripId;
     std::vector<double> rawTimes[2]; // leading and trailing
     std::vector<double> calibratedTimes[2];
     double trackedCalibratedTime[2];
@@ -74,33 +75,35 @@ namespace INO {
   class INOEvent {
   public:
     INOEvent() : eventTime(std::numeric_limits<double>::quiet_NaN()),
-		 shiftTDCTime(std::numeric_limits<double>::quiet_NaN()) {
+                 lowestCalibratedLeadingTime(std::numeric_limits<double>::quiet_NaN()),
+                 highestCalibratedLeadingTime(std::numeric_limits<double>::quiet_NaN())
+    {
       rawHits.clear();
       rawTDCs[0].clear();
       rawTDCs[1].clear();
     }
 
-    void addHit(const HitId& hitId) {
+    void addHit(const StripId& stripId) {
       Hit rawHit;
-      rawHit.hitId = hitId;
-      rawHit.rawPosition = hitId.strip + 0.5;
+      rawHit.stripId = stripId;
+      rawHit.rawPosition = stripId.strip + 0.5;
       for (int timeType = 0; timeType < 2; timeType++) {
-	/* 0 for leading, 1 for trailing */
-	/* 8 TDCs per side */
-	TDCId tdcId = {hitId.module, hitId.row, hitId.column,
-		       hitId.layer, hitId.side, hitId.strip % 8};
-	if (rawTDCs[timeType].count(tdcId))
-	  rawHit.rawTimes[timeType] = rawTDCs[timeType][tdcId];
+        /* 0 for leading, 1 for trailing */
+        /* 8 TDCs per side */
+        TDCId tdcId = {stripId.module, stripId.row, stripId.column,
+                       stripId.layer, stripId.side, stripId.strip % 8};
+        if (rawTDCs[timeType].count(tdcId))
+          rawHit.rawTimes[timeType] = rawTDCs[timeType][tdcId];
       }
-      rawHits[hitId] = rawHit; 
+      rawHits[stripId] = rawHit; 
     }
 
-    bool hasHit(const HitId& hitId) const {
-      return rawHits.find(hitId) != rawHits.end(); 
+    bool hasHit(const StripId& stripId) const {
+      return rawHits.count(stripId);
     }
 
-    void removeHit(const HitId& hitId) { 
-      rawHits.erase(hitId); 
+    void removeHit(const StripId& stripId) { 
+      rawHits.erase(stripId); 
     }
 
     // Method to get all hits
@@ -120,19 +123,31 @@ namespace INO {
     /*   return hits; */
     /* } */
 
+    // Method to get raw leading time of a hit
+    double getRawLeadingTime(const StripId& stripId) const {
+      if (rawHits.count(stripId)) {
+        auto it = rawHits.find(stripId);
+        if (int(it->second.rawTimes[0].size()))
+          return it->second.rawTimes[0][0];
+      }
+      return std::numeric_limits<double>::quiet_NaN();
+    }
+
     // Method to get tracked leading time of a hit
-    double getTrackedLeadingTime(const HitId& hitId) const {
-      auto it = rawHits.find(hitId);
-      if (it != rawHits.end())
-	return it->second.trackedCalibratedTime[0];
+    double getTrackedLeadingTime(const StripId& stripId) const {
+      if (rawHits.count(stripId)) {
+        auto it = rawHits.find(stripId);
+        return it->second.trackedCalibratedTime[0];
+      }
       return std::numeric_limits<double>::quiet_NaN();
     }
 
     // Method to get aligned position of a hit
-    double getAlignedPosition(const HitId& hitId) const {
-      auto it = rawHits.find(hitId);
-      if (it != rawHits.end())
-	return it->second.alignedPosition;
+    double getAlignedPosition(const StripId& stripId) const {
+      if (rawHits.count(stripId)) {
+        auto it = rawHits.find(stripId);
+        return it->second.alignedPosition;
+      }
       return std::numeric_limits<double>::quiet_NaN();
     }
 
@@ -146,8 +161,8 @@ namespace INO {
     std::vector<double> getLeadingTDCs() const {
       std::vector<double> leadingTDCs;
       for (const auto& entry : rawTDCs[0]) { // 0 = leading times
-	const std::vector<double>& times = entry.second;
-	leadingTDCs.insert(leadingTDCs.end(), times.begin(), times.end());
+        const std::vector<double>& times = entry.second;
+        leadingTDCs.insert(leadingTDCs.end(), times.begin(), times.end());
       }
       return leadingTDCs;
     }
@@ -162,21 +177,67 @@ namespace INO {
       return eventTime;
     }
 
-    // Setter for shift TDC time
-    void setShiftTDCTime(double time) {
-      shiftTDCTime = time;
+    // Setter to compute and update lowest and highest calibrated leading times
+    void updateCalibratedLeadingTimeBounds() {
+      lowestCalibratedLeadingTime = std::numeric_limits<double>::infinity();
+      highestCalibratedLeadingTime = -std::numeric_limits<double>::infinity();
+      for (const auto& entry : rawHits) {
+        const StripId& stripId = entry.first;
+        const Hit& hit = entry.second;
+        if (hit.rawTimes[0].empty()) continue;
+        double calibration = getTimeCalibration(stripId, 0);
+        for (double rawTime : hit.rawTimes[0]) {
+          double adjustedTime = rawTime - calibration;
+          if (adjustedTime < lowestCalibratedLeadingTime)
+            lowestCalibratedLeadingTime = adjustedTime;
+          if (adjustedTime > highestCalibratedLeadingTime)
+            highestCalibratedLeadingTime = adjustedTime;
+        }
+      }
+      // Handle case when no valid times are found
+      if (lowestCalibratedLeadingTime == std::numeric_limits<double>::infinity()) {
+        lowestCalibratedLeadingTime = std::numeric_limits<double>::quiet_NaN();
+      }
+      if (highestCalibratedLeadingTime == -std::numeric_limits<double>::infinity()) {
+        highestCalibratedLeadingTime = std::numeric_limits<double>::quiet_NaN();
+      }
     }
 
-    // Getter for shift TDC time
-    double getShiftTDCTime() const {
-      return shiftTDCTime;
+    // Getter for lowest calibrated leading time
+    double getLowestCalibratedLeadingTime() {
+      if (std::isnan(lowestCalibratedLeadingTime))
+        updateCalibratedLeadingTimeBounds();
+      return lowestCalibratedLeadingTime;
+    }
+
+    // Getter for highest calibrated leading time
+    double getHighestCalibratedLeadingTime() {
+      if (std::isnan(highestCalibratedLeadingTime))
+        updateCalibratedLeadingTimeBounds();
+      return highestCalibratedLeadingTime;
+    }
+
+    // Setter for time calibration
+    void setTimeCalibration(const StripId& stripId, double time) {
+      timeCalibration[stripId] = time;
+    }
+
+    // Setter for time calibration
+    double getTimeCalibration(const StripId& stripId, double time) const {
+      if (timeCalibration.count(stripId)) {
+        auto it = timeCalibration.find(stripId);
+        return it->second;
+      }
+      return 0;
     }
 
   private:
-    std::map<HitId, Hit> rawHits;
+    std::map<StripId, Hit> rawHits;
     std::map<TDCId, std::vector<double>> rawTDCs[2]; /* 8 TDCs per side, both leading and trailing */
+    std::map<StripId, double> timeCalibration;
     double eventTime;
-    double shiftTDCTime;
+    double lowestCalibratedLeadingTime;
+    double highestCalibratedLeadingTime;
   };
 
 } // namespace INO

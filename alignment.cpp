@@ -138,45 +138,6 @@ const double   rpcXOffset        = 0.;	  //
 const double   rpcYOffset        = 0.;	  // 
 const double   moduleDistance    = 0.;	  //
 
-struct RawHitId {
-  int module;
-  int row;
-  int column;
-  int layer;
-  int side;
-  int strip;
-};
-
-struct RawHit {
-  RawHitId hitId;
-  std::vector<double> rawTimes[2]; // leading and trailing
-  std::vector<double> calibratedTimes[2];
-  double trackedCalibratedTime[2];
-  double rawPosition;
-  double alignedPosition;
-};
-
-std::map <RawHitId, RawHit> rawHits;
-
-struct rawlayer {
-  std::vector<double> rawTDC[nside][nTDC][2]; // leading and trailing
-  std::map<int, int> hit[nside];	      // hits
-};
-
-struct PosInfo {
-  Double_t pos;
-  int multi;
-};
-
-struct PosInSpace {
-  rawlayer     rawhitInfo;
-  TVector3     RawHitPos;	// Middle of the Cluster
-  TVector3     PosCorrection;
-};
-
-// struct TrackInfo {
-// };
-
 
 // void LinearVectorFit(bool              isTime, // time iter
 // 		     vector<TVector3>  pos,
@@ -351,8 +312,8 @@ int main(int argc, char** argv) {
     if(iev%1000==0) {
       Long64_t stop_s = clock();
       cout << " iev " << iev
-	   << " time " << (stop_s-start_s)/Double_t(CLOCKS_PER_SEC)
-	   << endl;
+           << " time " << (stop_s-start_s)/Double_t(CLOCKS_PER_SEC)
+           << endl;
     }
 
     ttExecTimeVal = 100000000;
@@ -374,38 +335,39 @@ int main(int argc, char** argv) {
     // setting rawTDCs
     for(int ij=0;ij<nlayer;ij++)
       for(int nj=0;nj<nside;nj++)
-	for (int ntdc = 0; ntdc < 8; ntdc++) {
-	  int nTDCHits = event->xythit[nj][ij][ntdc];
-	  for (int tc = 0; tc < nTDCHits; tc++) {
-	    int rawTDCl = event->xytime[nj][ij][ntdc][tc] * tdc_least;
-	    int rawTDCt = rawTDCl + event->plWidth[nj][ij][ntdc][tc] * tdc_least;
-	    inoEvent->addTDC(INO::TDCId{0,0,0,ij,nj,ntdc}, rawTDCl, 0);
-	    inoEvent->addTDC(INO::TDCId{0,0,0,ij,nj,ntdc}, rawTDCt, 1);
-	    if(ttExecTimeVal > rawTDCt) ttExecTimeVal = rawTDCt;
-	  }
-	}
+        for (int ntdc = 0; ntdc < 8; ntdc++) {
+          int nTDCHits = event->xythit[nj][ij][ntdc];
+          for (int tc = 0; tc < nTDCHits; tc++) {
+            int rawTDCl = event->xytime[nj][ij][ntdc][tc] * tdc_least;
+            int rawTDCt = rawTDCl + event->plWidth[nj][ij][ntdc][tc] * tdc_least;
+            inoEvent->addTDC(INO::TDCId{0,0,0,ij,nj,ntdc}, rawTDCl, 0);
+            inoEvent->addTDC(INO::TDCId{0,0,0,ij,nj,ntdc}, rawTDCt, 1);
+            if(ttExecTimeVal > rawTDCt) ttExecTimeVal = rawTDCt;
+          }
+        }
     // setting strip hits
     for(int ij=0;ij<nlayer;ij++)
       for(int nj=0;nj<nside;nj++)
-	for(int kl=nstrip-1; kl>=0; kl--)
-	  if((event->xydata[nj][ij]>>kl)&0x01)
-	    inoEvent->addHit(INO::HitId{0,0,0,ij,nj,kl});
-    inoEvent->setShiftTDCTime(ttExecTimeVal - 100);
+        for(int kl=nstrip-1; kl>=0; kl--)
+          if((event->xydata[nj][ij]>>kl)&0x01)
+            inoEvent->addHit(INO::StripId{0,0,0,ij,nj,kl});
 
 #ifdef isDebug
     for (const auto* hit : inoEvent->getHits()) {
-      INO::HitId hitId = hit->hitId;
-      double leadingTime = inoEvent->getTrackedLeadingTime(hitId);
-
-      std::cout << std::setw(10) << "Module: " << hitId.module
-		<< " | Row: " << hitId.row
-		<< " | Column: " << hitId.column
-		<< " | Layer: " << hitId.layer
-		<< " | Side: " << (hitId.side ? "X" : "Y")
-		<< " | Strip: " << hitId.strip
-		<< " | Leading Time: " 
-		<< std::fixed << std::setprecision(3) << leadingTime 
-		<< " ns\n";
+      INO::StripId stripId = hit->stripId;
+      double rawTime = inoEvent->getRawLeadingTime(stripId);
+      double low = inoEvent->getLowestCalibratedLeadingTime();
+      double high = inoEvent->getHighestCalibratedLeadingTime();
+      std::cout << std::setw(10) << "Module: " << stripId.module
+                << " | Row: " << stripId.row
+                << " | Column: " << stripId.column
+                << " | Layer: " << stripId.layer
+                << " | Side: " << (stripId.side ? "Y" : "X")
+                << " | Strip: " << stripId.strip
+                << " | Raw Time: "
+                << std::fixed << std::setprecision(3) << rawTime << " ns"
+                << " | Low Time: " << low << " ns"
+                << " | High Time: " << high << " ns\n";
     }
 #endif
 
