@@ -35,6 +35,7 @@ namespace INO {
     std::vector<const Hit*> getHits() const;
     // Method to get raw leading time of a hit
     double getRawLeadingTime(const StripId& stripId) const;
+    std::vector<double> getRawLeadingTimes(const StripId& stripId) const;
     // Method to get all leading TDC values
     std::vector<double> getCalibratedLeadingTimes(const StripId& stripId) const;
 
@@ -84,8 +85,6 @@ namespace INO {
     double eventTime;
     double lowestCalibratedLeadingTime;
     double highestCalibratedLeadingTime;
-
-    static std::shared_ptr<INOCalibrationManager> m_inoCalibrationManager;
   };
 
 } // namespace INO

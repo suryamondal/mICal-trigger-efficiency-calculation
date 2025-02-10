@@ -2,8 +2,6 @@
 
 namespace INO {
 
-  std::shared_ptr<INOCalibrationManager> INOEvent::m_inoCalibrationManager = nullptr;
-
   INOEvent::INOEvent() 
     : eventTime(std::numeric_limits<double>::quiet_NaN()),
       lowestCalibratedLeadingTime(std::numeric_limits<double>::quiet_NaN()),
@@ -11,10 +9,10 @@ namespace INO {
     rawHits.clear();
     rawTDCs[0].clear();
     rawTDCs[1].clear();
-    m_inoCalibrationManager = INOCalibrationManager::getInstance();
   }
 
   void INOEvent::addHit(const StripId& stripId) {
+    INOCalibrationManager& inoCalibrationManager = INOCalibrationManager::getInstance();
     Hit rawHit;
     rawHit.stripId = stripId;
     rawHit.rawPosition = stripId.strip + 0.5;
@@ -24,7 +22,7 @@ namespace INO {
       if (rawTDCs[timeType].count(tdcId))
         rawHit.rawTimes[timeType] = rawTDCs[timeType][tdcId];
       for (auto rawTime : rawHit.rawTimes[timeType])
-        rawHit.calibratedTimes[timeType].push_back(rawTime - m_inoCalibrationManager->getTimeCalibration(stripId));
+        rawHit.calibratedTimes[timeType].push_back(rawTime - inoCalibrationManager.getTimeCalibration(stripId));
     }
     rawHits[stripId] = rawHit; 
   }
@@ -50,6 +48,13 @@ namespace INO {
     if (it != rawHits.end() && !it->second.rawTimes[0].empty())
       return it->second.rawTimes[0][0];
     return std::numeric_limits<double>::quiet_NaN();
+  }
+
+  std::vector<double> INOEvent::getRawLeadingTimes(const StripId& stripId) const {
+    auto it = rawHits.find(stripId); 
+    if (it != rawHits.end())
+      return it->second.rawTimes[0];
+    return {};
   }
 
   std::vector<double> INOEvent::getCalibratedLeadingTimes(const StripId& stripId) const {
