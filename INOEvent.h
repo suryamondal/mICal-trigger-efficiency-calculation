@@ -129,8 +129,8 @@ namespace INO {
 
     // Method to get raw leading time of a hit
     double getRawLeadingTime(const StripId& stripId) const {
-      if (rawHits.count(stripId)) {
-        auto it = rawHits.find(stripId);
+      auto it = rawHits.find(stripId);
+      if (it != rawHits.end()) {
         if (int(it->second.rawTimes[0].size()))
           return it->second.rawTimes[0][0];
       }
@@ -147,19 +147,17 @@ namespace INO {
 
     // Method to get tracked leading time of a hit
     double getTrackedLeadingTime(const StripId& stripId) const {
-      if (rawHits.count(stripId)) {
-        auto it = rawHits.find(stripId);
+      auto it = rawHits.find(stripId);
+      if (it != rawHits.end())
         return it->second.trackedCalibratedTime[0];
-      }
       return std::numeric_limits<double>::quiet_NaN();
     }
 
     // Method to get aligned position of a hit
     double getAlignedPosition(const StripId& stripId) const {
-      if (rawHits.count(stripId)) {
-        auto it = rawHits.find(stripId);
+      auto it = rawHits.find(stripId);
+      if (it != rawHits.end())
         return it->second.alignedPosition;
-      }
       return std::numeric_limits<double>::quiet_NaN();
     }
 
@@ -236,10 +234,9 @@ namespace INO {
 
     // Getter for time calibration
     double getTimeCalibration(const StripId& stripId) const {
-      if (timeCalibration.count(stripId)) {
-        auto it = timeCalibration.find(stripId);
+      auto it = timeCalibration.find(stripId);
+      if (it != timeCalibration.end())
         return it->second;
-      }
       return 0;
     }
 
