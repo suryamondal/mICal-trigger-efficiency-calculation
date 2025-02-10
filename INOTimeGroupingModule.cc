@@ -1,5 +1,5 @@
 
-#include "TimeGroupingModule.h"
+#include "INOTimeGroupingModule.h"
 
 // root
 #include <TString.h>
@@ -7,7 +7,7 @@
 using namespace INO;
 
 
-TimeGroupingModule::TimeGroupingModule(std::shared_ptr<INOEvent> data) :
+INOTimeGroupingModule::INOTimeGroupingModule(std::shared_ptr<INOEvent> data) :
   m_inoEvent(data)
 {
   // Fill time Histogram:
@@ -36,7 +36,7 @@ TimeGroupingModule::TimeGroupingModule(std::shared_ptr<INOEvent> data) :
 }
 
 
-void TimeGroupingModule::process()
+void INOTimeGroupingModule::process()
 {
   if (int(m_inoEvent->getEntries()) < 4) return;
 
@@ -63,7 +63,7 @@ void TimeGroupingModule::process()
 } // end of event
 
 
-void TimeGroupingModule::createAndFillHistorgram(TH1D& hist)
+void INOTimeGroupingModule::createAndFillHistorgram(TH1D& hist)
 {
 
   // minimise the range of the histogram removing empty bins at the edge
@@ -95,7 +95,7 @@ void TimeGroupingModule::createAndFillHistorgram(TH1D& hist)
 } // end of createAndFillHistorgram
 
 
-void TimeGroupingModule::searchGausPeaksInHistogram(TH1D& hist, std::vector<GroupInfo>& groupInfoVector)
+void INOTimeGroupingModule::searchGausPeaksInHistogram(TH1D& hist, std::vector<GroupInfo>& groupInfoVector)
 {
 
   double maxPeak     = 0.;  //   height of the highest peak in signal region [expectedSignalTimeMin, expectedSignalTimeMax]
@@ -190,7 +190,7 @@ void TimeGroupingModule::searchGausPeaksInHistogram(TH1D& hist, std::vector<Grou
 
 
 
-void TimeGroupingModule::sortBackgroundGroups(std::vector<GroupInfo>& groupInfoVector)
+void INOTimeGroupingModule::sortBackgroundGroups(std::vector<GroupInfo>& groupInfoVector)
 {
   GroupInfo keyGroup;
   for (int ij = int(groupInfoVector.size()) - 2; ij >= 0; ij--) {
@@ -220,7 +220,7 @@ void TimeGroupingModule::sortBackgroundGroups(std::vector<GroupInfo>& groupInfoV
 }
 
 
-void TimeGroupingModule::sortSignalGroups(std::vector<GroupInfo>& groupInfoVector)
+void INOTimeGroupingModule::sortSignalGroups(std::vector<GroupInfo>& groupInfoVector)
 {
   if (m_usedPars.signalLifetime > 0.) {
     GroupInfo keyGroup;
@@ -253,7 +253,7 @@ void TimeGroupingModule::sortSignalGroups(std::vector<GroupInfo>& groupInfoVecto
 }
 
 
-void TimeGroupingModule::assignGroupIdsToClusters(TH1D& hist, std::vector<GroupInfo>& groupInfoVector)
+void INOTimeGroupingModule::assignGroupIdsToClusters(TH1D& hist, std::vector<GroupInfo>& groupInfoVector)
 {
   int totClusters = m_inoEvent->getEntries();
   double tRangeLow  = hist.GetXaxis()->GetXmin();

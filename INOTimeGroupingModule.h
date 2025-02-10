@@ -65,12 +65,12 @@ namespace INO {
   /**
    * Imports Clusters of the detector and converts them to spacePoints.
    */
-  class TimeGroupingModule {
+  class INOTimeGroupingModule {
 
   public:
 
     /** Constructor */
-    TimeGroupingModule(std::shared_ptr<INOEvent> data);
+    INOTimeGroupingModule(std::shared_ptr<INOEvent> data);
 
     /** EventWise jobs
      * Grouping of Clusters is performed here
