@@ -2,6 +2,7 @@
 
 #include <memory>
 #include <map>
+#include <string>
 
 namespace INO {
   
@@ -62,7 +63,7 @@ namespace INO {
   public:
     INOCalibrationManager() {}
     // Get the singleton instance
-    static std::shared_ptr<INOCalibrationManager> getInstance();
+    static INOCalibrationManager& getInstance();
 
     // Setter for time calibration
     void setTimeCalibration(const StripId& stripId, double time) {
@@ -77,9 +78,10 @@ namespace INO {
       return 0;
     }
 
-  private:
-    static std::shared_ptr<INOCalibrationManager> instance;
+    void loadTimeCalibration(const std::string& filename);
+    void writeTimeCalibration(const std::string& filename);
 
+  private:
     std::map<StripId, double> timeCalibration;
   };
 
