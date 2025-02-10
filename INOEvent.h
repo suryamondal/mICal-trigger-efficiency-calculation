@@ -70,6 +70,8 @@ namespace INO {
     double trackedCalibratedTime[2];
     double rawPosition;
     double alignedPosition;
+    std::vector<int> m_timeGroupId;    /**< Grouping of clusters in time */
+    std::vector<std::tuple<float, float, float>> m_timeGroupInfo; /**< TimeGroup Gaussian Parameters, (integral, center, sigma) */
   };
 
   class INOEvent {
@@ -94,6 +96,8 @@ namespace INO {
                        stripId.layer, stripId.side, stripId.strip % 8};
         if (rawTDCs[timeType].count(tdcId))
           rawHit.rawTimes[timeType] = rawTDCs[timeType][tdcId];
+        for (auto rawTime : rawHit.rawTimes[timeType])
+          rawHit.calibratedTimes[timeType].push_back(item - getTimeCalibration(stripId));
       }
       rawHits[stripId] = rawHit; 
     }
@@ -131,6 +135,14 @@ namespace INO {
           return it->second.rawTimes[0][0];
       }
       return std::numeric_limits<double>::quiet_NaN();
+    }
+
+    // Method to get all leading TDC values
+    std::vector<double> getCalibratedLeadingTimes(const StripId& stripId) const {
+      auto it = rawHits.find(stripId); 
+      if (it != rawHits.end())
+        return it->second.calibratedTimes[0];
+      return {};
     }
 
     // Method to get tracked leading time of a hit
@@ -185,7 +197,7 @@ namespace INO {
         const StripId& stripId = entry.first;
         const Hit& hit = entry.second;
         if (hit.rawTimes[0].empty()) continue;
-        double calibration = getTimeCalibration(stripId, 0);
+        double calibration = getTimeCalibration(stripId);
         for (double rawTime : hit.rawTimes[0]) {
           double adjustedTime = rawTime - calibration;
           if (adjustedTime < lowestCalibratedLeadingTime)
@@ -230,6 +242,28 @@ namespace INO {
       }
       return 0;
     }
+
+    /** Get ID of the time-group.
+     * @return time-group ID
+     */
+    const std::vector<int>& getTimeGroupId(const StripId& stripId) const { return rawHits[stripId].m_timeGroupId; }
+
+    /** Get time-group parameters.
+     * @return time-group parameters (integral, center, sigma)
+     */
+    const std::vector<std::tuple<float, float, float>>& getTimeGroupInfo(const StripId& stripId) const { return rawHits[stripId].m_timeGroupInfo; }
+
+    /** Set ID of the time-group.
+     * @return reference to time-group ID
+     */
+    std::vector<int>& setTimeGroupId(const StripId& stripId) { return rawHits[stripId].m_timeGroupId; }
+
+    /** Set time-group parameters.
+     * @return reference to the time-group parameters (integral, center, sigma)
+     */
+    std::vector<std::tuple<float, float, float>>& setTimeGroupInfo(const StripId& stripId) { return rawHits[stripId].m_timeGroupInfo; }
+
+    int getEntries() const { return rawHits.size(); }
 
   private:
     std::map<StripId, Hit> rawHits;
