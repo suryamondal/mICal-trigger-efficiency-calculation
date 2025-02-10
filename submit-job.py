@@ -1,12 +1,15 @@
 import os
 import subprocess
 import concurrent.futures
+import glob
+import signal
+import sys
 
 # Configuration
 ROOT_DIR = "/media/surya/Surya_1/DaqMadurai/maduraiData_mICAL/SuryaFormat"
 OUTPUT_DIR = "/home/surya/Documents/Gobinda/IICHEP/mICal-trigger-efficiency-calculation/calibration-data"
 EXECUTABLE = "/home/surya/Documents/Gobinda/IICHEP/mICal-trigger-efficiency-calculation/build/alignment"
-SPLIT_SIZE = 100000
+SPLIT_SIZE = 500001
 MAX_WORKERS = 10
 
 # ROOT script for getting entries (embedded as a string)
@@ -69,33 +72,32 @@ def process_root_file(root_file):
     log_dir = os.path.join(OUTPUT_DIR, "logs")
     os.makedirs(log_dir, exist_ok=True)
 
-    if entries <= SPLIT_SIZE:
-        start, end = 0, entries - 1
-        log_file = os.path.join(log_dir, f"{file_no_ext}_0.log")
-        print(f"Processing: {start} {end}")
-        cmd = [EXECUTABLE, root_file, output_prefix + f"_{split_count:02d}",
-               str(start), str(end)]
-        print(cmd)
+    split_count = 0
+    for start in range(0, max(entries, 1), SPLIT_SIZE):
+        end = min(start + SPLIT_SIZE - 1, entries - 1)
+        extension = "" if entries <= SPLIT_SIZE else f"_{split_count:02d}"
+        log_file = os.path.join(log_dir, f"{file_no_ext}{extension}.log")
+        print(f"Processing: {start} {end}")  # Print affected range
+        cmd = [EXECUTABLE, root_file, output_prefix + extension, str(start), str(end)]
+        print(f"Running: {' '.join(cmd)} | Log: {log_file}")
         with open(log_file, "w") as log:
             subprocess.run(cmd, stdout=log, stderr=log)
-    else:
-        split_count = 0
-        for start in range(0, entries, SPLIT_SIZE):
-            end = min(start + SPLIT_SIZE - 1, entries - 1)
-            log_file = os.path.join(log_dir, f"{file_no_ext}_{split_count}.log")
-            print(f"Processing: {start} {end}")  # Only prints affected range
-            cmd = [EXECUTABLE, root_file, output_prefix + f"_{split_count:02d}", str(start), str(end)]
-            print(cmd)
-            with open(log_file, "w") as log:
-                subprocess.run(cmd, stdout=log, stderr=log)
-            split_count += 1
+        split_count += 1  # Increment split counter
 
 def main():
-    root_files = sorted([os.path.join(ROOT_DIR, f) for f in os.listdir(ROOT_DIR) if f.endswith(".root")])
+    root_files = sorted(glob.glob(os.path.join(ROOT_DIR, "*.root")))
     write_root_script()
 
     with concurrent.futures.ProcessPoolExecutor(max_workers=MAX_WORKERS) as executor:
-        executor.map(process_root_file, root_files)
+        future_to_file = {executor.submit(process_root_file, rf): rf for rf in root_files}
+        
+        try:
+            for future in concurrent.futures.as_completed(future_to_file):
+                future.result()
+        except KeyboardInterrupt:
+            print("KeyboardInterrupt detected! Stopping workers...")
+            executor.shutdown(wait=True, cancel_futures=True)
+            sys.exit(1)
 
 if __name__ == "__main__":
     main()
