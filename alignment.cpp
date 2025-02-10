@@ -228,6 +228,8 @@ int main(int argc, char** argv) {
   */
 
   INO::INOCalibrationManager& inoCalibrationManager = INO::INOCalibrationManager::getInstance();
+  inoCalibrationManager.loadTimeCalibration("calibration-data/SNM_RPCv4t_evtraw_20181212_193056_RawTimeOffset.txt");
+
 
   char datafile[300] = {};
   strncpy(datafile,argv[1],300);
