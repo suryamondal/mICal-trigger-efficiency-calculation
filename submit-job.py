@@ -7,8 +7,8 @@ import sys
 
 # Configuration
 ROOT_DIR = "/media/surya/Surya_1/DaqMadurai/maduraiData_mICAL/SuryaFormat"
-OUTPUT_DIR = "/home/surya/Documents/Gobinda/IICHEP/mICal-trigger-efficiency-calculation/calibration-data"
-EXECUTABLE = "/home/surya/Documents/Gobinda/IICHEP/mICal-trigger-efficiency-calculation/build/alignment"
+OUTPUT_DIR = "output"
+EXECUTABLE = "build/alignment"
 SPLIT_SIZE = 500001
 MAX_WORKERS = 10
 
