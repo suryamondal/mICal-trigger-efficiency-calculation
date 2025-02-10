@@ -11,6 +11,7 @@ OUTPUT_DIR = "output"
 EXECUTABLE = "build/alignment"
 SPLIT_SIZE = 500001
 MAX_WORKERS = 10
+MAX_FILES = 1
 
 # ROOT script for getting entries (embedded as a string)
 ROOT_SCRIPT = """
@@ -89,7 +90,7 @@ def main():
     write_root_script()
 
     with concurrent.futures.ProcessPoolExecutor(max_workers=MAX_WORKERS) as executor:
-        future_to_file = {executor.submit(process_root_file, rf): rf for rf in root_files}
+        future_to_file = {executor.submit(process_root_file, rf): rf for rf in root_files[0:MAX_FILES]}
         
         try:
             for future in concurrent.futures.as_completed(future_to_file):
