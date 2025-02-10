@@ -32,7 +32,7 @@ INOTimeGroupingModule::INOTimeGroupingModule(std::shared_ptr<INOEvent> data) :
   m_usedPars.writeGroupInfo = true;
   // Handle out-of-range clusters:
   m_usedPars.includeOutOfRangeClusters = true;
-  m_usedPars.clsSigma = 2.0;
+  m_usedPars.clsSigma = 10.0;
 }
 
 

@@ -33,6 +33,7 @@
 #include "SNM.h"
 #include "INOEvent.h"
 #include "INOManager.h"
+#include "INOTimeGroupingModule.h"
 
 using namespace std;
 
@@ -259,8 +260,6 @@ int main(int argc, char** argv) {
 #endif	// #ifdef isIter
 
   const char *sideMark[nside] = {"x","y"};
-  
-  Double_t           ttExecTimeVal;
 
   Double_t evetimeFill, evesepFill, recotimeFill, recosepFill;
   
@@ -315,8 +314,6 @@ int main(int argc, char** argv) {
            << " time " << (stop_s-start_s)/Double_t(CLOCKS_PER_SEC)
            << endl;
     }
-
-    ttExecTimeVal = 100000000;
   
     fileIn->cd();
     event_tree->GetEntry(iev);
@@ -342,7 +339,6 @@ int main(int argc, char** argv) {
             int rawTDCt = rawTDCl + event->plWidth[nj][ij][ntdc][tc] * tdc_least;
             inoEvent->addTDC(INO::TDCId{0,0,0,ij,nj,ntdc}, rawTDCl, 0);
             inoEvent->addTDC(INO::TDCId{0,0,0,ij,nj,ntdc}, rawTDCt, 1);
-            if(ttExecTimeVal > rawTDCt) ttExecTimeVal = rawTDCt;
           }
         }
     // setting strip hits
@@ -351,6 +347,9 @@ int main(int argc, char** argv) {
         for(int kl=nstrip-1; kl>=0; kl--)
           if((event->xydata[nj][ij]>>kl)&0x01)
             inoEvent->addHit(INO::StripId{0,0,0,ij,nj,kl});
+
+    std::shared_ptr<INO::INOTimeGroupingModule> inoTimeGrouping = std::make_shared<INO::INOTimeGroupingModule>(inoEvent);
+    inoTimeGrouping->process();
 
 #ifdef isDebug
     for (const auto* hit : inoEvent->getHits()) {
@@ -364,15 +363,17 @@ int main(int argc, char** argv) {
                 << " | Layer: " << stripId.layer
                 << " | Side: " << (stripId.side ? "Y" : "X")
                 << " | Strip: " << stripId.strip
+                << " | Groups: " << inoEvent->getTimeGroupId(stripId).size()
                 << " | Raw Time: "
                 << std::fixed << std::setprecision(3) << rawTime << " ns"
                 << " | Low Time: " << low << " ns"
-                << " | High Time: " << high << " ns\n";
+                << " | High Time: " << high << " ns"
+                << std::endl;
     }
 #endif
 
   } // for(Long64_t iev=nentrymn;iev<nentry;iev++) {
- 
+
   return 0;
 }; // main
 
