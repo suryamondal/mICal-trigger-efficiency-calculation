@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.10)
 project(Alignment)
 
-find_package(ROOT REQUIRED COMPONENTS Core RIO Tree Hist)  # Add Hist component
+find_package(ROOT REQUIRED COMPONENTS Core RIO Tree Hist)
 include(${ROOT_USE_FILE})
 
 set(SOURCES
