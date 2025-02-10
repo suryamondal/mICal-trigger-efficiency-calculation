@@ -97,7 +97,7 @@ namespace INO {
         if (rawTDCs[timeType].count(tdcId))
           rawHit.rawTimes[timeType] = rawTDCs[timeType][tdcId];
         for (auto rawTime : rawHit.rawTimes[timeType])
-          rawHit.calibratedTimes[timeType].push_back(item - getTimeCalibration(stripId));
+          rawHit.calibratedTimes[timeType].push_back(rawTime - getTimeCalibration(stripId));
       }
       rawHits[stripId] = rawHit; 
     }
@@ -243,12 +243,22 @@ namespace INO {
     /** Get ID of the time-group.
      * @return time-group ID
      */
-    const std::vector<int>& getTimeGroupId(const StripId& stripId) const { return rawHits[stripId].m_timeGroupId; }
+    std::vector<int> getTimeGroupId(const StripId& stripId) const {
+      auto it = rawHits.find(stripId);
+      if (it != rawHits.end())
+        return it->second.m_timeGroupId;
+      return {};
+    }
 
     /** Get time-group parameters.
      * @return time-group parameters (integral, center, sigma)
      */
-    const std::vector<std::tuple<float, float, float>>& getTimeGroupInfo(const StripId& stripId) const { return rawHits[stripId].m_timeGroupInfo; }
+    std::vector<std::tuple<float, float, float>> getTimeGroupInfo(const StripId& stripId) const {
+      auto it = rawHits.find(stripId);
+      if (it != rawHits.end())
+        return it->second.m_timeGroupInfo;
+      return {};
+    }
 
     /** Set ID of the time-group.
      * @return reference to time-group ID

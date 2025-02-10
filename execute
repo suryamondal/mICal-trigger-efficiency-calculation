@@ -12,14 +12,20 @@ rm INOManagerdict.cxx
 rm INOManagerdict_rdict.pcm
 rootcint INOManagerdict.cxx -c INOManager.h
 
+rm TimeGroupingModuledict.cxx
+rm TimeGroupingModuledict_rdict.pcm
+rootcint TimeGroupingModuledict.cxx -c TimeGroupingModule.h
+
 g++ -c SNMdict.cxx `root-config --cflags`  
 g++ -c INOEventdict.cxx `root-config --cflags`  
 g++ -c INOManagerdict.cxx `root-config --cflags`  
+g++ -c TimeGroupingModuledict.cxx `root-config --cflags`
 
 rm Dict_rdict.pcm
 rootcint -f Dict.cc -c -I. -Wall -Wno-deprecated LinkDef.h
 g++ -c Dict.cc  `root-config --cflags` 
 
 g++ -c SNM.C  `root-config --cflags`
+g++ -c TimeGroupingModule.cc  `root-config --cflags`
 
-g++ `root-config --cflags` -o alignment.o INOEventdict.o INOManagerdict.o SNMdict.o SNM.o Dict.o alignment.cpp `root-config --glibs`
+g++ `root-config --cflags` -o alignment.o INOEventdict.o INOManagerdict.o TimeGroupingModuledict.o SNMdict.o SNM.o TimeGroupingModule.o Dict.o alignment.cpp `root-config --glibs`
