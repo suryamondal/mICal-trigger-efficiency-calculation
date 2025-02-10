@@ -1,6 +1,6 @@
 
 
-#define isDebug
+// #define isDebug
 
 #include <iostream>
 #include <fstream>
@@ -9,6 +9,7 @@
 #include <ctime>
 #include <bitset>
 #include <memory>
+#include <csignal>
 
 #include "TTimeStamp.h"
 #include "TH1.h"
@@ -34,6 +35,7 @@
 #include "INOEvent.h"
 #include "INOStorageManager.h"
 #include "INOTimeGroupingModule.h"
+#include "DynamicHistogram.h"
 
 using namespace std;
 
@@ -57,76 +59,6 @@ const double     cval_mps      =   0.29979e9; /* light speed in m/s */
 const double     airDensity    = 0.0012; /* in g/cm3 */
 const double     gapDensity    = 0.4;	 /* in g/cm3 */
 const double     ironDensity   = 7.86;	 /* in g/cm3 */
-
-
-
-// const double poserrsq_ref[6] = {0.08,0.08,0.08,0.08,0.08,0.08};
-// const double timeErr_ref[6] = {1.,1.,1.,1.,1.,1.};
-
-// const double poserrsq_ref[6] =
-//   {
-//    0.103728,	// m0 xr0 yr0 z4 x mul1
-//    0.0794917,	// m0 xr0 yr0 z4 x mul2
-//    0.131974,	// m0 xr0 yr0 z4 x mul3
-//    0.449816,	// m0 xr0 yr0 z4 x mul4
-//    0.849692,	// m0 xr0 yr0 z4 x mul5
-//    1.23988	// m0 xr0 yr0 z4 x mul6
-//   };
-// const double timeErr_ref[6] =
-//   {
-//    1.2939,	// m0 xr0 yr0 z4 x mul1
-//    1.43214,	// m0 xr0 yr0 z4 x mul2
-//    1.07453,	// m0 xr0 yr0 z4 x mul3
-//    1.416,	// m0 xr0 yr0 z4 x mul4
-//    1.81177,	// m0 xr0 yr0 z4 x mul5
-//    1.69344	// m0 xr0 yr0 z4 x mul6
-//   };
-
-// const double poserrsq[1][1][1][10][2][6] = { // nmod,xrow,yrow,zlay,side,nmxhits
-//    0.08,0.08,0.08,0.08,0.08,0.08,
-//    0.08,0.08,0.08,0.08,0.08,0.08,
-//    0.08,0.08,0.08,0.08,0.08,0.08,
-//    0.08,0.08,0.08,0.08,0.08,0.08,
-//    0.08,0.08,0.08,0.08,0.08,0.08,
-//    0.08,0.08,0.08,0.08,0.08,0.08,
-//    0.08,0.08,0.08,0.08,0.08,0.08,
-//    0.08,0.08,0.08,0.08,0.08,0.08,
-//    0.08,0.08,0.08,0.08,0.08,0.08,
-//    0.08,0.08,0.08,0.08,0.08,0.08,
-//    0.08,0.08,0.08,0.08,0.08,0.08,
-//    0.08,0.08,0.08,0.08,0.08,0.08,
-//    0.08,0.08,0.08,0.08,0.08,0.08,
-//    0.08,0.08,0.08,0.08,0.08,0.08,
-//    0.08,0.08,0.08,0.08,0.08,0.08,
-//    0.08,0.08,0.08,0.08,0.08,0.08,
-//    0.08,0.08,0.08,0.08,0.08,0.08,
-//    0.08,0.08,0.08,0.08,0.08,0.08,
-//    0.08,0.08,0.08,0.08,0.08,0.08,
-//    0.08,0.08,0.08,0.08,0.08,0.08
-// };
-
-// const double timeerrsq[1][1][1][10][2][6] = { // nmod,xrow,yrow,zlay,side,nmxhits
-//    1,1,1,1,1,1,
-//    1,1,1,1,1,1,
-//    1,1,1,1,1,1,
-//    1,1,1,1,1,1,
-//    1,1,1,1,1,1,
-//    1,1,1,1,1,1,
-//    1,1,1,1,1,1,
-//    1,1,1,1,1,1,
-//    1,1,1,1,1,1,
-//    1,1,1,1,1,1,
-//    1,1,1,1,1,1,
-//    1,1,1,1,1,1,
-//    1,1,1,1,1,1,
-//    1,1,1,1,1,1,
-//    1,1,1,1,1,1,
-//    1,1,1,1,1,1,
-//    1,1,1,1,1,1,
-//    1,1,1,1,1,1,
-//    1,1,1,1,1,1,
-//    1,1,1,1,1,1
-// };
 
 
 const double   gapThickness      = 0.008; // 
@@ -233,31 +165,38 @@ const double   moduleDistance    = 0.;	  //
 // };
 
 
-
+volatile sig_atomic_t stopFlag = 0; // Global flag to detect Ctrl+C
+// Signal handler function
+void signalHandler(int signum) {
+  std::cout << "\nInterrupt signal (" << signum << ") received. Stopping loop...\n";
+  stopFlag = 1;  // Set flag to break loop
+}
 
 int main(int argc, char** argv) {
 
   /* 
-     argv[0] : main
-     argv[1] : filename
-     argv[2] : start event
-     argv[3] : number of event from begining
-     argv[4] : output file number
-     argv[5] : itermodule
-     argv[6] : iterxrow
-     argv[7] : iteryrow
-     argv[8] : iterlayer
-     argv[9] :
-     argv[10] :
+     argv[0]  : main
+     argv[1]  : inputfilename
+     argv[2]  : outputfilename
+     argv[3]  : start event
+     argv[4]  : end event
+     argv[5]  : output file number
+     argv[6]  : itermodule
+     argv[7]  : iterxrow
+     argv[8]  : iteryrow
+     argv[9]  : iterlayer
+     argv[10] : (empty or additional argument)
   */
-
   
-#ifdef isIter
-  int itermodule = stoi(argv[5]);
-  int iterxrow = stoi(argv[6]);
-  int iteryrow = stoi(argv[7]);
-  int iterlayer = stoi(argv[8]);
-#endif	// #ifdef isIter
+  // #ifdef isIter
+  //   int itermodule = stoi(argv[5]);
+  //   int iterxrow = stoi(argv[6]);
+  //   int iteryrow = stoi(argv[7]);
+  //   int iterlayer = stoi(argv[8]);
+  // #endif	// #ifdef isIter
+
+  // Register signal handler for Ctrl+C
+  signal(SIGINT, signalHandler);
 
   const char *sideMark[nside] = {"x","y"};
 
@@ -288,14 +227,20 @@ int main(int argc, char** argv) {
     O : [the letter o, not a zero] a boolean (Bool_t)
   */
 
+  INO::INOCalibrationManager& inoCalibrationManager = INO::INOCalibrationManager::getInstance();
 
   char datafile[300] = {};
   strncpy(datafile,argv[1],300);
-  std::cout << datafile << std::endl;
-  Long64_t nentrymx = stoi(argv[3]);
-  Long64_t nentrymn = stoi(argv[2]);
+  char outfile[300] = {};
+  strncpy(outfile,argv[2],300);
+  Long64_t nentrymn = stoi(argv[3]);
+  Long64_t nentrymx = stoi(argv[4]);
 
-  TFile *fileIn = new TFile(datafile, "read");
+  // TFile* fileOut = new TFile(outfile, "recreate");
+  // fileOut->cd();
+  std::map<INO::StripId, DynamicHistogram> constantStripTimeDelay;
+
+  TFile* fileIn = new TFile(datafile, "read");
 
   if(fileIn->IsZombie()) return 0;
 
@@ -325,9 +270,9 @@ int main(int argc, char** argv) {
     evesepFill = inoEvent->getEventTime() - evetimeFill;
     evetimeFill = inoEvent->getEventTime();
 
-#ifdef isDebug
-    cout << " time " << eventTime << endl;
-#endif  // #ifdef isDebug
+// #ifdef isDebug
+//     cout << " time " << eventTime << endl;
+// #endif  // #ifdef isDebug
 
     // setting rawTDCs
     for(int ij=0;ij<nlayer;ij++)
@@ -348,31 +293,63 @@ int main(int argc, char** argv) {
           if((event->xydata[nj][ij]>>kl)&0x01)
             inoEvent->addHit(INO::StripId{0,0,0,ij,nj,kl});
 
-    std::shared_ptr<INO::INOTimeGroupingModule> inoTimeGrouping = std::make_shared<INO::INOTimeGroupingModule>(inoEvent);
-    inoTimeGrouping->process();
-
-#ifdef isDebug
     for (const auto* hit : inoEvent->getHits()) {
       INO::StripId stripId = hit->stripId;
-      double rawTime = inoEvent->getRawLeadingTime(stripId);
-      double low = inoEvent->getLowestCalibratedLeadingTime();
-      double high = inoEvent->getHighestCalibratedLeadingTime();
-      std::cout << std::setw(10) << "Module: " << stripId.module
-                << " | Row: " << stripId.row
-                << " | Column: " << stripId.column
-                << " | Layer: " << stripId.layer
-                << " | Side: " << (stripId.side ? "Y" : "X")
-                << " | Strip: " << stripId.strip
-                << " | Groups: " << inoEvent->getTimeGroupId(stripId).size()
-                << " | Raw Time: "
-                << std::fixed << std::setprecision(3) << rawTime << " ns"
-                << " | Low Time: " << low << " ns"
-                << " | High Time: " << high << " ns"
-                << std::endl;
+      for (auto time : inoEvent->getRawLeadingTimes(stripId))
+        constantStripTimeDelay[stripId].fillValue(time);
     }
-#endif
+
+    std::shared_ptr<INO::INOTimeGroupingModule> inoTimeGrouping = std::make_shared<INO::INOTimeGroupingModule>(inoEvent);
+    // inoTimeGrouping->process();
+
+    // #ifdef isDebug
+    //     for (const auto* hit : inoEvent->getHits()) {
+    //       INO::StripId stripId = hit->stripId;
+    //       double rawTime = inoEvent->getRawLeadingTime(stripId);
+    //       double low = inoEvent->getLowestCalibratedLeadingTime();
+    //       double high = inoEvent->getHighestCalibratedLeadingTime();
+    //       std::cout << std::setw(10) << "Module: " << stripId.module
+    //                 << " | Row: " << stripId.row
+    //                 << " | Column: " << stripId.column
+    //                 << " | Layer: " << stripId.layer
+    //                 << " | Side: " << (stripId.side ? "Y" : "X")
+    //                 << " | Strip: " << stripId.strip
+    //                 << " | Groups: " << inoEvent->getTimeGroupId(stripId).size()
+    //                 << " | Raw Time: "
+    //                 << std::fixed << std::setprecision(3) << rawTime << " ns"
+    //                 << " | Low Time: " << low << " ns"
+    //                 << " | High Time: " << high << " ns"
+    //                 << std::endl;
+    //     }
+    // #endif
+
+    if (stopFlag) {
+      std::cout << "Exiting loop due to Ctrl+C.\n";
+      break;
+    }
 
   } // for(Long64_t iev=nentrymn;iev<nentry;iev++) {
+
+  for (auto item : constantStripTimeDelay) {
+    auto stripId = item.first;
+    auto fistBin = item.second.getPeak();
+    if (fistBin.count < 5) continue;
+    inoCalibrationManager.setTimeCalibration(stripId, fistBin.center);
+#ifdef isDebug
+    std::cout << std::setw(10) << "Module: " << stripId.module
+              << " | Row: " << stripId.row
+              << " | Column: " << stripId.column
+              << " | Layer: " << stripId.layer
+              << " | Side: " << (stripId.side ? "Y" : "X")
+              << " | Strip: " << stripId.strip
+              << " | Count: " << fistBin.count
+              << " | Center: " << fistBin.center
+              << std::endl;
+#endif
+  }
+
+  inoCalibrationManager.writeTimeCalibration(std::string(outfile) + "_RawTimeOffset.txt");
+  fileIn->Close();
 
   return 0;
 }; // main
