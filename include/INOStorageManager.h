@@ -4,10 +4,9 @@
 
 namespace INO {
   
-  class INOManager {
+  class INOStorageManager {
   public:
-    INOManager() {
-    }
+    INOStorageManager();
     
   private:
     

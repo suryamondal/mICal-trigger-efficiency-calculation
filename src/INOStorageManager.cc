@@ -1,15 +1,4 @@
-#pragma once
 
-#include <memory>
+#include "INOStorageManager.h"
 
-namespace INO {
-  
-  class INOManager {
-  public:
-    INOManager() {
-    }
-    
-  private:
-    
-  };
-} // namespace INO
+INO::INOStorageManager::INOStorageManager() {};

@@ -32,7 +32,7 @@
 
 #include "SNM.h"
 #include "INOEvent.h"
-#include "INOManager.h"
+#include "INOStorageManager.h"
 #include "INOTimeGroupingModule.h"
 
 using namespace std;
