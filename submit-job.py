@@ -7,11 +7,12 @@ import sys
 
 # Configuration
 ROOT_DIR = "/media/surya/Surya_1/DaqMadurai/maduraiData_mICAL/SuryaFormat"
+FILE_REGEX = "SNM_RPC*.root"
 OUTPUT_DIR = "output"
 EXECUTABLE = "build/alignment"
-SPLIT_SIZE = 500001
+SPLIT_SIZE = 50000
 MAX_WORKERS = 10
-MAX_FILES = 1
+MAX_FILES = 100000
 
 # ROOT script for getting entries (embedded as a string)
 ROOT_SCRIPT = """
@@ -73,20 +74,26 @@ def process_root_file(root_file):
     log_dir = os.path.join(OUTPUT_DIR, "logs")
     os.makedirs(log_dir, exist_ok=True)
 
+    # Check if any matching output file already exists
+    existing_outputs = glob.glob(f"{output_prefix}*")
+    if existing_outputs:
+        print(f"Skipping {root_file}, output files already exist: {existing_outputs}")
+        return  # Skip processing if output files are found
+
     split_count = 0
     for start in range(0, max(entries, 1), SPLIT_SIZE):
         end = min(start + SPLIT_SIZE - 1, entries - 1)
-        extension = "" if entries <= SPLIT_SIZE else f"_{split_count:02d}"
-        log_file = os.path.join(log_dir, f"{file_no_ext}{extension}.log")
+        suffix = "" if entries <= SPLIT_SIZE else f"_{split_count:02d}"
+        log_file = os.path.join(log_dir, f"{file_no_ext}{suffix}.log")
         print(f"Processing: {start} {end}")  # Print affected range
-        cmd = [EXECUTABLE, root_file, output_prefix + extension, str(start), str(end)]
+        cmd = [EXECUTABLE, root_file, output_prefix + suffix, str(start), str(end)]
         print(f"Running: {' '.join(cmd)} | Log: {log_file}")
         with open(log_file, "w") as log:
             subprocess.run(cmd, stdout=log, stderr=log)
         split_count += 1  # Increment split counter
 
 def main():
-    root_files = sorted(glob.glob(os.path.join(ROOT_DIR, "*.root")))
+    root_files = sorted(glob.glob(os.path.join(ROOT_DIR, FILE_REGEX)))
     write_root_script()
 
     with concurrent.futures.ProcessPoolExecutor(max_workers=MAX_WORKERS) as executor:

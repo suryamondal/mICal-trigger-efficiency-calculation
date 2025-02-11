@@ -238,8 +238,9 @@ int main(int argc, char** argv) {
   Long64_t nentrymn = stoi(argv[3]);
   Long64_t nentrymx = stoi(argv[4]);
 
-  TFile* fileOut = new TFile((std::string(outfile) + "_RawTimeOffset.root").c_str(), "recreate");
+  TFile* fileOut = new TFile((std::string(outfile) + ".root").c_str(), "recreate");
   fileOut->cd();
+
   std::map<INO::StripId, TH1D*> constantStripTimeDelay;
 
   TFile* fileIn = new TFile(datafile, "read");
@@ -348,7 +349,6 @@ int main(int argc, char** argv) {
     if(item.second)
       item.second->Write();
   }
-
 
   fileOut->Close();
 
