@@ -4,6 +4,7 @@ import concurrent.futures
 import glob
 import signal
 import sys
+import re
 
 # Configuration
 ROOT_DIR = "/media/surya/Surya_1/DaqMadurai/maduraiData_mICAL/SuryaFormat"
@@ -92,13 +93,12 @@ def process_root_file(root_file):
             subprocess.run(cmd, stdout=log, stderr=log)
         split_count += 1  # Increment split counter
 
-def main():
+
+def submit_jobs():
     root_files = sorted(glob.glob(os.path.join(ROOT_DIR, FILE_REGEX)))
     write_root_script()
-
     with concurrent.futures.ProcessPoolExecutor(max_workers=MAX_WORKERS) as executor:
         future_to_file = {executor.submit(process_root_file, rf): rf for rf in root_files[0:MAX_FILES]}
-        
         try:
             for future in concurrent.futures.as_completed(future_to_file):
                 future.result()
@@ -106,6 +106,52 @@ def main():
             print("KeyboardInterrupt detected! Stopping workers...")
             executor.shutdown(wait=True, cancel_futures=True)
             sys.exit(1)
+
+
+def merge_files_by_date():
+    """Merges all output files from the same day into one inside output/merged/."""
+    merged_dir = os.path.join(OUTPUT_DIR, "merged")
+    os.makedirs(merged_dir, exist_ok=True)
+
+    # Find all unique (prefix, date, suffix) groups
+    file_pattern = os.path.join(OUTPUT_DIR, "*_20??????_*")  # Matches *_YYYYMMDD_*
+    output_files = glob.glob(file_pattern)
+    file_groups = {}
+
+    for f in output_files:
+        match = re.search(r"(.+)_20(\d{6})_\d{6}_(\d+)\.(.+)", os.path.basename(f))
+        if match:
+            prefix, date, _, suffix = match.groups()
+            key = (prefix, date, suffix)  # Group by prefix, date, and suffix
+            file_groups.setdefault(key, []).append(f)
+
+    # Merge each group in parallel
+    def merge_group(key, files):
+        prefix, date, suffix = key
+        merged_file = os.path.join(merged_dir, f"{prefix}_20{date}.{suffix}")
+        log_file = os.path.join(merged_dir, f"{prefix}_20{date}.{suffix}.log")
+
+        if os.path.exists(merged_file):
+            print(f"Skipping merge for {merged_file}, already exists.")
+            return
+
+        print(f"Merging {len(files)} files into {merged_file}... | Log: {log_file}")
+        cmd = ["hadd", "-f", merged_file] + files
+        print(f"Running: {' '.join(cmd)} | Log: {log_file}")
+        with open(log_file, "w") as log:
+            cmd = ["hadd", "-f", merged_file] + files
+            subprocess.run(cmd, stdout=log, stderr=log)
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+        futures = {executor.submit(merge_group, key, files): key for key, files in file_groups.items()}
+        for future in concurrent.futures.as_completed(futures):
+            future.result()  # Ensure all merging completes
+
+
+def main():
+
+    submit_jobs();
+    merge_files_by_date()
 
 if __name__ == "__main__":
     main()
