@@ -69,8 +69,6 @@ void INOTimeGroupingModule::createAndFillHistorgram(TH1D& hist)
   // minimise the range of the histogram removing empty bins at the edge
   // to speed up the execution time.
 
-  int totClusters = m_inoEvent->getEntries();
-
   double tRangeHigh = m_usedPars.tRange[1];
   double tRangeLow  = m_usedPars.tRange[0];
 
@@ -83,13 +81,14 @@ void INOTimeGroupingModule::createAndFillHistorgram(TH1D& hist)
   hist = TH1D("h_clsTime", "h_clsTime", nBin, tRangeLow, tRangeHigh);
   hist.GetXaxis()->SetLimits(tRangeLow, tRangeHigh);
 
-  auto tdcTimes = m_inoEvent->getLeadingTDCs();
-
-  for (int ij = 0; ij < totClusters; ij++) {
-    double gCenter = tdcTimes[ij];
-    double gSigma  = m_usedPars.clsSigma;
-    // adding/filling a gauss to histogram
-    addGausToHistogram(hist, 1., gCenter, gSigma, m_usedPars.fillSigmaN);
+  for (auto hit : m_inoEvent->getHits()) {
+    auto stripId = hit->stripId;
+    auto stripTimes = m_inoEvent->getCalibratedLeadingTimes(stripId);
+    for (auto stripTime : stripTimes) {
+      double gSigma  = m_usedPars.clsSigma;
+      // adding/filling a gauss to histogram
+      addGausToHistogram(hist, 1., stripTime, gSigma, m_usedPars.fillSigmaN);
+    }
   }
 
 } // end of createAndFillHistorgram

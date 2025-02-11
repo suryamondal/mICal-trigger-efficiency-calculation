@@ -35,7 +35,7 @@
 #include "INOEvent.h"
 #include "INOStorageManager.h"
 #include "INOTimeGroupingModule.h"
-#include "DynamicHistogram.h"
+// #include "DynamicHistogram.h"
 
 using namespace std;
 
@@ -238,9 +238,9 @@ int main(int argc, char** argv) {
   Long64_t nentrymn = stoi(argv[3]);
   Long64_t nentrymx = stoi(argv[4]);
 
-  // TFile* fileOut = new TFile(outfile, "recreate");
-  // fileOut->cd();
-  std::map<INO::StripId, DynamicHistogram> constantStripTimeDelay;
+  TFile* fileOut = new TFile((std::string(outfile) + "_RawTimeOffset.root").c_str(), "recreate");
+  fileOut->cd();
+  std::map<INO::StripId, TH1D*> constantStripTimeDelay;
 
   TFile* fileIn = new TFile(datafile, "read");
 
@@ -297,33 +297,40 @@ int main(int argc, char** argv) {
 
     for (const auto* hit : inoEvent->getHits()) {
       INO::StripId stripId = hit->stripId;
+      auto it = constantStripTimeDelay.find(stripId);
+      if (it == constantStripTimeDelay.end()) {
+        std::string stripName = inoCalibrationManager.getStripName(stripId).c_str();
+        // std::cout << stripName << std::endl;
+        constantStripTimeDelay[stripId] = new TH1D(stripName.c_str(), stripName.c_str(), 200, -312.5, -212.5);
+        constantStripTimeDelay[stripId]->SetDirectory(0);
+      }
       for (auto time : inoEvent->getRawLeadingTimes(stripId))
-        constantStripTimeDelay[stripId].fillValue(time);
+        constantStripTimeDelay[stripId]->Fill(time);
     }
 
     std::shared_ptr<INO::INOTimeGroupingModule> inoTimeGrouping = std::make_shared<INO::INOTimeGroupingModule>(inoEvent);
     // inoTimeGrouping->process();
 
-    // #ifdef isDebug
-    //     for (const auto* hit : inoEvent->getHits()) {
-    //       INO::StripId stripId = hit->stripId;
-    //       double rawTime = inoEvent->getRawLeadingTime(stripId);
-    //       double low = inoEvent->getLowestCalibratedLeadingTime();
-    //       double high = inoEvent->getHighestCalibratedLeadingTime();
-    //       std::cout << std::setw(10) << "Module: " << stripId.module
-    //                 << " | Row: " << stripId.row
-    //                 << " | Column: " << stripId.column
-    //                 << " | Layer: " << stripId.layer
-    //                 << " | Side: " << (stripId.side ? "Y" : "X")
-    //                 << " | Strip: " << stripId.strip
-    //                 << " | Groups: " << inoEvent->getTimeGroupId(stripId).size()
-    //                 << " | Raw Time: "
-    //                 << std::fixed << std::setprecision(3) << rawTime << " ns"
-    //                 << " | Low Time: " << low << " ns"
-    //                 << " | High Time: " << high << " ns"
-    //                 << std::endl;
-    //     }
-    // #endif
+    #ifdef isDebug
+        for (const auto* hit : inoEvent->getHits()) {
+          INO::StripId stripId = hit->stripId;
+          double calibratedTime = inoEvent->getCalibratedLeadingTimes(stripId)[0];
+          double low = inoEvent->getLowestCalibratedLeadingTime();
+          double high = inoEvent->getHighestCalibratedLeadingTime();
+          std::cout << std::setw(10) << "Module: " << stripId.module
+                    << " | Row: " << stripId.row
+                    << " | Column: " << stripId.column
+                    << " | Layer: " << stripId.layer
+                    << " | Side: " << (stripId.side ? "Y" : "X")
+                    << " | Strip: " << stripId.strip
+                    << " | Groups: " << inoEvent->getTimeGroupId(stripId).size()
+                    << " | Calibrated Time: "
+                    << std::fixed << std::setprecision(3) << calibratedTime << " ns"
+                    // << " | Low Time: " << low << " ns"
+                    // << " | High Time: " << high << " ns"
+                    << std::endl;
+        }
+    #endif
 
     if (stopFlag) {
       std::cout << "Exiting loop due to Ctrl+C.\n";
@@ -331,27 +338,24 @@ int main(int argc, char** argv) {
     }
 
   } // for(Long64_t iev=nentrymn;iev<nentry;iev++) {
+  fileIn->Close();
 
-  for (auto item : constantStripTimeDelay) {
-    auto stripId = item.first;
-    auto fistBin = item.second.getPeak();
-    if (fistBin.count < 5) continue;
-    inoCalibrationManager.setTimeCalibration(stripId, fistBin.center);
-#ifdef isDebug
-    std::cout << std::setw(10) << "Module: " << stripId.module
-              << " | Row: " << stripId.row
-              << " | Column: " << stripId.column
-              << " | Layer: " << stripId.layer
-              << " | Side: " << (stripId.side ? "Y" : "X")
-              << " | Strip: " << stripId.strip
-              << " | Count: " << fistBin.count
-              << " | Center: " << fistBin.center
-              << std::endl;
-#endif
+  // inoCalibrationManager.writeTimeCalibration(std::string(outfile) + "_RawTimeOffset.txt");
+
+  TDirectory* dir = fileOut->mkdir("ConstantStripTimeDelay");
+  dir->cd();
+  for (auto& item : constantStripTimeDelay) {
+    if(item.second)
+      item.second->Write();
   }
 
-  inoCalibrationManager.writeTimeCalibration(std::string(outfile) + "_RawTimeOffset.txt");
-  fileIn->Close();
+
+  fileOut->Close();
+
+  for (auto& item : constantStripTimeDelay) {
+    if(item.second)
+      delete item.second;
+  }
 
   return 0;
 }; // main

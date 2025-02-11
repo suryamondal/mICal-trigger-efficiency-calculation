@@ -103,10 +103,10 @@ namespace INO {
     lowestCalibratedLeadingTime = std::numeric_limits<double>::infinity();
     highestCalibratedLeadingTime = -std::numeric_limits<double>::infinity();
     for (const auto& entry : rawHits) {
-      if (entry.second.rawTimes[0].empty()) continue;
-      for (double rawTime : entry.second.rawTimes[0]) {
-        lowestCalibratedLeadingTime = std::min(lowestCalibratedLeadingTime, rawTime);
-        highestCalibratedLeadingTime = std::max(highestCalibratedLeadingTime, rawTime);
+      if (entry.second.calibratedTimes[0].empty()) continue;
+      for (double calibratedTime : entry.second.calibratedTimes[0]) {
+        lowestCalibratedLeadingTime = std::min(lowestCalibratedLeadingTime, calibratedTime);
+        highestCalibratedLeadingTime = std::max(highestCalibratedLeadingTime, calibratedTime);
       }
     }
     if (lowestCalibratedLeadingTime == std::numeric_limits<double>::infinity())
