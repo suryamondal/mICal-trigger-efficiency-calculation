@@ -36,6 +36,7 @@
 #include "INOStorageManager.h"
 #include "INOTimeGroupingModule.h"
 // #include "DynamicHistogram.h"
+#include "INOHelperFunctions.h"
 
 using namespace std;
 
@@ -300,8 +301,7 @@ int main(int argc, char** argv) {
       INO::StripId stripId = hit->stripId;
       auto it = constantStripTimeDelay.find(stripId);
       if (it == constantStripTimeDelay.end()) {
-        std::string stripName = inoCalibrationManager.getStripName(stripId).c_str();
-        // std::cout << stripName << std::endl;
+        std::string stripName = INO::getStripName(stripId).c_str();
         constantStripTimeDelay[stripId] = new TH1D(stripName.c_str(), stripName.c_str(), 200, -312.5, -212.5);
         constantStripTimeDelay[stripId]->SetDirectory(0);
       }

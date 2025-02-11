@@ -29,8 +29,6 @@ namespace INO {
 
     void loadTimeCalibration(const std::string& filename);
     void writeTimeCalibration(const std::string& filename);
-    
-    std::string getStripName(const StripId& stripId) const;
 
   private:
     std::map<StripId, double> timeCalibration;
