@@ -12,17 +12,6 @@
 
 namespace INO {
 
-  struct Hit {
-    StripId stripId;
-    std::vector<double> rawTimes[2]; // leading and trailing
-    std::vector<double> calibratedTimes[2];
-    double trackedCalibratedTime[2];
-    double rawPosition;
-    double alignedPosition;
-    std::vector<int> m_timeGroupId;    /**< Grouping of clusters in time */
-    std::vector<std::tuple<float, float, float>> m_timeGroupInfo; /**< TimeGroup Gaussian Parameters, (integral, center, sigma) */
-  };
-
   class INOEvent {
   public:
     INOEvent();
