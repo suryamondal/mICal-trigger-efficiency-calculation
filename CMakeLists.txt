@@ -4,13 +4,26 @@ project(Alignment)
 find_package(ROOT REQUIRED COMPONENTS Core RIO Tree Hist)
 include(${ROOT_USE_FILE})
 
-# Include the headers directory
+# Include headers
 include_directories(include)
 
-# Automatically find all .cc files in the src directory
+# Find SQLite3
+find_package(SQLite3 REQUIRED)
+
+# Automatically find .cc files in src/
 file(GLOB SOURCES src/*.cc)
 
-# Add the executable with alignment.cpp outside
+# Add executable
 add_executable(alignment alignment.cpp ${SOURCES})
-# Link against the necessary ROOT libraries
-target_link_libraries(alignment ROOT::Core ROOT::RIO ROOT::Tree ROOT::Hist)
+# Link against ROOT and MySQL libraries
+target_link_libraries(alignment ROOT::Core ROOT::RIO ROOT::Tree ROOT::Hist  SQLite::SQLite3)
+
+# Add executable
+add_executable(computeStripTimeDelayFromHistograms computeStripTimeDelayFromHistograms.cpp ${SOURCES})
+# Link against ROOT and MySQL libraries
+target_link_libraries(computeStripTimeDelayFromHistograms ROOT::Core ROOT::RIO ROOT::Tree ROOT::Hist SQLite::SQLite3)
+
+# Add executable
+add_executable(createTTreeForCorry createTTreeForCorry.cpp ${SOURCES})
+# Link against ROOT and MySQL libraries
+target_link_libraries(createTTreeForCorry ROOT::Core ROOT::RIO ROOT::Tree ROOT::Hist SQLite::SQLite3)

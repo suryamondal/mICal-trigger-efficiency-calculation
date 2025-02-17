@@ -1,6 +1,6 @@
 
 
-// #define isDebug
+#define isDebug
 
 #include <iostream>
 #include <fstream>
@@ -229,7 +229,6 @@ int main(int argc, char** argv) {
   */
 
   INO::INOCalibrationManager& inoCalibrationManager = INO::INOCalibrationManager::getInstance();
-  inoCalibrationManager.loadTimeCalibration("calibration-data/SNM_RPCv4t_evtraw_20181212_193056_RawTimeOffset.txt");
 
 
   char datafile[300] = {};
@@ -270,7 +269,7 @@ int main(int argc, char** argv) {
     std::shared_ptr<INO::INOEvent> inoEvent = std::make_shared<INO::INOEvent>();
 
     TTimeStamp eventTime = event->evetime[0];
-    inoEvent->setEventTime(eventTime.AsDouble());
+    inoEvent->setEventTime(eventTime.AsDouble() + (5 * 3600) + (30 * 60));
     evesepFill = inoEvent->getEventTime() - evetimeFill;
     evetimeFill = inoEvent->getEventTime();
 
@@ -340,8 +339,6 @@ int main(int argc, char** argv) {
 
   } // for(Long64_t iev=nentrymn;iev<nentry;iev++) {
   fileIn->Close();
-
-  // inoCalibrationManager.writeTimeCalibration(std::string(outfile) + "_RawTimeOffset.txt");
 
   TDirectory* dir = fileOut->mkdir("ConstantStripTimeDelay");
   dir->cd();

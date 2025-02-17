@@ -1,8 +1,8 @@
 #pragma once
 
-#include <memory>
-#include <map>
+#include <sqlite3.h>
 #include <string>
+#include <iostream>
 
 #include "INOStructs.h"
 
@@ -10,28 +10,20 @@ namespace INO {
 
   class INOCalibrationManager {
   public:
-    INOCalibrationManager() {}
-    // Get the singleton instance
     static INOCalibrationManager& getInstance();
 
-    // Setter for time calibration
-    void setTimeCalibration(const StripId& stripId, double time) {
-      timeCalibration[stripId] = time;
-    }
+    void setStripTimeOffset(const StripId& stripId, double start, double end, double value);
+    double getStripTimeOffset(const StripId& stripId, double time) const;
 
-    // Getter for time calibration
-    double getTimeCalibration(const StripId& stripId) const {
-      auto it = timeCalibration.find(stripId);
-      if (it != timeCalibration.end())
-        return it->second;
-      return 0;
-    }
-
-    void loadTimeCalibration(const std::string& filename);
-    void writeTimeCalibration(const std::string& filename);
+    void setStripPositionCorrection(const StripId& stripId, int position, double start, double end, double value);
+    double getStripPositionCorrection(const StripId& stripId, int position, double time) const;
 
   private:
-    std::map<StripId, double> timeCalibration;
+    INOCalibrationManager();
+    ~INOCalibrationManager();
+    void initializeDatabase();
+
+    sqlite3* db;
   };
 
 } // namespace INO
