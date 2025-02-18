@@ -14,11 +14,8 @@ namespace INO {
   public:
     static INOCalibrationManager& getInstance();
 
-    // void setStripTimeOffset(const StripId& stripId, double start, double end, double value);
     double getStripTimeDelay(const StripId& stripId, double time) const;
-
-    // void setStripPositionCorrection(const StripId& stripId, int position, double start, double end, double value);
-    void getLayerPosition(const StripId& stripId, const double& pos, TVector3 position, TVector3 orientation) const;
+    void getLayerPosition(const LayerId& layerId, const int& x, const int& y, TVector3& position, TVector3& orientation) const;
 
   private:
     INOCalibrationManager();

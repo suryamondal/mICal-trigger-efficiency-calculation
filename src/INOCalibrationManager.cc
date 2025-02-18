@@ -117,7 +117,8 @@ double INOCalibrationManager::getStripTimeDelay(const StripId& stripId, double t
 //   }
 // }
 
-void INOCalibrationManager::getLayerPosition(const StripId& stripId, const double& pos, TVector3 position, TVector3 orientation) const {
+void INOCalibrationManager::getLayerPosition(const LayerId& layerId, const int& x, const int& y,
+					     TVector3& position, TVector3& orientation) const {
   const char* sql = "SELECT position_x, position_y, position_z, orientation_x, orientation_y, orientation_z "
     "FROM Position WHERE Module =? AND Row =? AND Column =? AND Layer = ? AND detector_type_x = ? AND detector_type_y = ?;";
   sqlite3_stmt* stmt;
@@ -125,25 +126,23 @@ void INOCalibrationManager::getLayerPosition(const StripId& stripId, const doubl
   if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) == SQLITE_OK) {
 
     // Bind parameters to the SQL query
-    sqlite3_bind_int(stmt, 1, stripId.module);
-    sqlite3_bind_int(stmt, 2, stripId.row);
-    sqlite3_bind_int(stmt, 3, stripId.column);
-    sqlite3_bind_int(stmt, 4, stripId.layer);
-    sqlite3_bind_int(stmt, 5, stripId.side ? int(pos / 32.) : int(stripId.strip / 32.));
-    sqlite3_bind_int(stmt, 6, !stripId.side ? int(pos / 32.) : int(stripId.strip / 32.));
+    sqlite3_bind_int(stmt, 1, layerId.module);
+    sqlite3_bind_int(stmt, 2, layerId.row);
+    sqlite3_bind_int(stmt, 3, layerId.column);
+    sqlite3_bind_int(stmt, 4, layerId.layer);
+    sqlite3_bind_int(stmt, 5, x);
+    sqlite3_bind_int(stmt, 6, y);
 
     // Execute the query and retrieve the result
     if (sqlite3_step(stmt) == SQLITE_ROW) {
-      double position_x = sqlite3_column_double(stmt, 0);
-      double position_y = sqlite3_column_double(stmt, 1);
-      double position_z = sqlite3_column_double(stmt, 2);
-      double orientation_x = sqlite3_column_double(stmt, 3);
-      double orientation_y = sqlite3_column_double(stmt, 4);
-      double orientation_z = sqlite3_column_double(stmt, 5);
-
-      // // Output the retrieved values
-      // std::cout << "Position: (" << position_x << ", " << position_y << ", " << position_z << ")\n";
-      // std::cout << "Orientation: (" << orientation_x << ", " << orientation_y << ", " << orientation_z << ")\n";
+      position.SetX(sqlite3_column_double(stmt, 0));
+      position.SetY(sqlite3_column_double(stmt, 1));
+      position.SetZ(sqlite3_column_double(stmt, 2));
+      orientation.SetX(sqlite3_column_double(stmt, 3));
+      orientation.SetY(sqlite3_column_double(stmt, 4));
+      orientation.SetZ(sqlite3_column_double(stmt, 5));
+      // std::cout << "Position: (" << position.X() << ", " << position.Y() << ", " << position.Z() << ")\n";
+      // std::cout << "Orientation: (" << orientation.X() << ", " << orientation.Y() << ", " << orientation.Z() << ")\n";
     }
     sqlite3_finalize(stmt);
   }

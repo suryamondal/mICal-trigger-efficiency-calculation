@@ -17,6 +17,11 @@ namespace INO {
       return std::tie(module, row, column, layer) < 
         std::tie(other.module, other.row, other.column, other.layer);
     }
+    // Define operator== for equality comparison
+    bool operator==(const LayerId& other) const {
+      return std::tie(module, row, column, layer) == 
+	std::tie(other.module, other.row, other.column, other.layer);
+    }
   };
 
   struct TDCId {
@@ -65,12 +70,11 @@ namespace INO {
     int row;
     int column;
     int layer;
-    int xstrip;
-    int ystrip;
+    int strip[2];
     // Define operator< for map key comparison
     bool operator<(const PixelId& other) const {
-      return std::tie(module, row, column, layer, xstrip, ystrip) < 
-        std::tie(other.module, other.row, other.column, other.layer, other.xstrip, other.ystrip);
+      return std::tie(module, row, column, layer, strip[0], strip[1]) < 
+        std::tie(other.module, other.row, other.column, other.layer, other.strip[0], other.strip[1]);
     }
   };
   

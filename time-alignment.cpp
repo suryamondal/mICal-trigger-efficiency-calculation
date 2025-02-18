@@ -45,12 +45,15 @@ const int ntrigLayers = 4;
 const int trigLayers[ntrigLayers] = {0, 1, 2, 3};
 
 
+const double expectedEventTime = -255;
+const double triggerWindow     = 100;
+
 const int        nside         =   2;
 const int        nlayer        =  10;
 const int        nstrip        =  64;
 const int        nTDC          =   8;
 const double     tdc_least     =   0.1;	 // in ns
-const double     strpwidth     =   0.03; // in m
+const double     stripwidth     =   0.03; // in m
 
 const double     maxtime       =  22.e3;      // in ns
 const double     spdl          =   5.;	      // ns/m
@@ -71,6 +74,15 @@ const double   rpcZShift         = 0; //
 // const double   rpcXOffset        = 0.;	  // 
 // const double   rpcYOffset        = 0.;	  // 
 // const double   moduleDistance    = 0.;	  //
+
+
+double getLayerZ(const int& layer) {
+  return (airGap + ironThickness) * layer + rpcZShift;
+};
+
+int getILayer(const double& layer) {
+  return (layer - rpcZShift) / (airGap + ironThickness);
+};
 
 
 void LinearVectorFit(bool              isTime, // time iter
@@ -332,6 +344,27 @@ int main(int argc, char** argv) {
     }
 #endif
 
+    std::map<INO::LayerId, int> stripHits[2];
+    for (const auto* hit : inoEvent->getHits()) {
+      INO::StripId stripId = hit->stripId;
+      if(!int(inoEvent->getCalibratedLeadingTimes(stripId).size())) continue;
+      if (std::fabs(inoEvent->getCalibratedLeadingTimes(stripId)[0] - expectedEventTime) > triggerWindow * 0.5) continue;
+      stripHits[hit->stripId.side][{hit->stripId.module,
+	    hit->stripId.row,
+	    hit->stripId.column,
+	    hit->stripId.layer}] = hit->stripId.strip;
+    }
+    std::vector<INO::PixelId> allPixels;
+    for (auto xStripHit : stripHits[0])
+      for (auto yStripHit : stripHits[1])
+	if (xStripHit.first == yStripHit.first)
+	  allPixels.push_back({xStripHit.first.module,
+		xStripHit.first.row,
+		xStripHit.first.column,
+		xStripHit.first.layer,
+		{xStripHit.second, yStripHit.second}
+	    });
+
     std::vector<TVector3>  pos;
     std::vector<TVector2>  poserr;
     std::vector<bool>      occulay;
@@ -341,23 +374,51 @@ int main(int argc, char** argv) {
     std::vector<TVector3> ext;
     std::vector<TVector3> exterr;
 
-    for (const auto* hit : inoEvent->getHits()) {
-      INO::StripId stripId = hit->stripId;
-      int layer = hit->stripId.layer;
-      int side = hit->stripId.side;
-      int strip = hit->stripId.strip;
-      pos.push_back({
-          side ? 
-        });
-      // auto it = constantStripTimeDelay.find(stripId);
-      // if (it == constantStripTimeDelay.end()) {
-      //   std::string stripName = INO::getStripName(stripId).c_str();
-      //   constantStripTimeDelay[stripId] = new TH1D(stripName.c_str(), stripName.c_str(), 200, -312.5, -212.5);
-      //   constantStripTimeDelay[stripId]->SetDirectory(0);
-      // }
-      // for (auto time : inoEvent->getRawLeadingTimes(stripId))
-      //   constantStripTimeDelay[stripId]->Fill(time);
+    for (auto pixel : allPixels) {
+      TVector3 rawPos = {(pixel.strip[0] + 0.5) * stripwidth,
+			 (pixel.strip[1] + 0.5) * stripwidth,
+			 getLayerZ(pixel.layer)};
+      TVector3 rpcPosition, rpcOrientation;
+      inoCalibrationManager.getLayerPosition({
+	  pixel.module, pixel.row, pixel.column, pixel.layer},
+	pixel.strip[0] < 32 ? 0 : 1,
+	pixel.strip[1] < 32 ? 0 : 1,
+	rpcPosition, rpcOrientation);
+      rpcPosition *= 0.01; rpcPosition.SetZ(0);
+      rawPos += rpcPosition;
+      rawPos.RotateX(rpcOrientation.X() * TMath::DegToRad());
+      rawPos.RotateY(rpcOrientation.Y() * TMath::DegToRad());
+      rawPos.RotateZ(rpcOrientation.Z() * TMath::DegToRad());
+      pos.push_back(rawPos);
+      poserr.push_back({0.008, 0.008});
     }
+    LinearVectorFit(0, pos, poserr, occulay, slope, inter, chi2, ext, exterr);
+
+#ifdef isDebug
+    for (auto extHit : ext) {
+      TVector3 rawPos = extHit;
+      int layer = getILayer(extHit.Z());
+      int xstrip = int(extHit.X() / stripwidth);
+      int ystrip = int(extHit.Y() / stripwidth);
+      TVector3 rpcPosition, rpcOrientation;
+      inoCalibrationManager.getLayerPosition({
+	  0, 0, 0, layer},
+	xstrip < 32 ? 0 : 1,
+	ystrip < 32 ? 0 : 1,
+	rpcPosition, rpcOrientation);
+      rpcPosition *= 0.01; rpcPosition.SetZ(0);
+      rawPos -= rpcPosition;
+      rawPos.RotateX(-rpcOrientation.X() * TMath::DegToRad());
+      rawPos.RotateY(-rpcOrientation.Y() * TMath::DegToRad());
+      rawPos.RotateZ(-rpcOrientation.Z() * TMath::DegToRad());
+      pos.push_back(rawPos);
+      poserr.push_back({0.008, 0.008});
+      std::cout << " extX " << extHit.X() / stripwidth
+		<< " extY " << extHit.Y() / stripwidth
+		<< " extZ " << layer
+		<< std::endl; 
+    }
+#endif
 
     if (stopFlag) {
       std::cout << "Exiting loop due to Ctrl+C.\n";
