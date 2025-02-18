@@ -65,105 +65,105 @@ const double     ironDensity   = 7.86;	 /* in g/cm3 */
 const double   gapThickness      = 0.008; // 
 const double   ironThickness     = 0.056; // 
 const double   airGap            = 0.045; //
-const double   rpcZShift         =-0.005; // 
-const double   rpcXdistance      = 2.;	  // 
-const double   rpcYdistance      = 2.1;	  // 
-const double   rpcXOffset        = 0.;	  // 
-const double   rpcYOffset        = 0.;	  // 
-const double   moduleDistance    = 0.;	  //
+const double   rpcZShift         = 0; //
+// const double   rpcXdistance      = 2.;	  // 
+// const double   rpcYdistance      = 2.1;	  // 
+// const double   rpcXOffset        = 0.;	  // 
+// const double   rpcYOffset        = 0.;	  // 
+// const double   moduleDistance    = 0.;	  //
 
 
-// void LinearVectorFit(bool              isTime, // time iter
-// 		     vector<TVector3>  pos,
-// 		     vector<TVector2>  poserr,
-// 		     vector<bool>      occulay,
-// 		     TVector2         &slope,
-// 		     TVector2         &inter,
-// 		     TVector2         &chi2,
-// 		     vector<TVector3> &ext,
-// 		     vector<TVector3> &exterr) {
+void LinearVectorFit(bool              isTime, // time iter
+                     std::vector<TVector3>  pos,
+                     std::vector<TVector2>  poserr,
+                     std::vector<bool>      occulay,
+                     TVector2         &slope,
+                     TVector2         &inter,
+                     TVector2         &chi2,
+                     std::vector<TVector3> &ext,
+                     std::vector<TVector3> &exterr) {
   
-//   double szxy[nside] = {0};
-//   double   sz[nside] = {0};
-//   double  sxy[nside] = {0};
-//   double   sn[nside] = {0};
-//   double  sz2[nside] = {0};
+  double szxy[nside] = {0};
+  double   sz[nside] = {0};
+  double  sxy[nside] = {0};
+  double   sn[nside] = {0};
+  double  sz2[nside] = {0};
   
-//   double     slp[nside] = {-10000,-10000};
-//   double  tmpslp[nside] = {-10000,-10000};
-//   double intersect[nside] = {-10000,-10000};
-//   double    errcst[nside] = {-10000,-10000};
-//   double    errcov[nside] = {-10000,-10000};
-//   double    errlin[nside] = {-10000,-10000};
+  double     slp[nside] = {-10000,-10000};
+  double  tmpslp[nside] = {-10000,-10000};
+  double intersect[nside] = {-10000,-10000};
+  double    errcst[nside] = {-10000,-10000};
+  double    errcov[nside] = {-10000,-10000};
+  double    errlin[nside] = {-10000,-10000};
   
-//   for(int ij=0;ij<int(pos.size());ij++) {
-//     if(int(occulay.size()) && !occulay[ij]) {continue;}
-//     // cout << " ij " << ij << endl;
-//     double xyzval[3] = {pos[ij].X(),
-// 			pos[ij].Y(),
-// 			pos[ij].Z()};
-//     double xyerr[2]  = {poserr[ij].X(),
-// 			poserr[ij].Y()};
-//     for(int nj=0;nj<nside;nj++) {
-//       szxy[nj] += xyzval[2]*xyzval[nj]/xyerr[nj];
-//       sz[nj]   += xyzval[2]/xyerr[nj];
-//       sz2[nj]  += xyzval[2]*xyzval[2]/xyerr[nj];
-//       sxy[nj]  += xyzval[nj]/xyerr[nj];
-//       sn[nj]   += 1/xyerr[nj];
-//     }   // for(int nj=0;nj<nside;nj++) {
-//   } // for(int ij=0;ij<int(pos.size());ij++){
+  for(int ij=0;ij<int(pos.size());ij++) {
+    if(int(occulay.size()) && !occulay[ij]) {continue;}
+    // cout << " ij " << ij << endl;
+    double xyzval[3] = {pos[ij].X(),
+                        pos[ij].Y(),
+                        pos[ij].Z()};
+    double xyerr[2]  = {poserr[ij].X(),
+                        poserr[ij].Y()};
+    for(int nj=0;nj<nside;nj++) {
+      szxy[nj] += xyzval[2]*xyzval[nj]/xyerr[nj];
+      sz[nj]   += xyzval[2]/xyerr[nj];
+      sz2[nj]  += xyzval[2]*xyzval[2]/xyerr[nj];
+      sxy[nj]  += xyzval[nj]/xyerr[nj];
+      sn[nj]   += 1/xyerr[nj];
+    }   // for(int nj=0;nj<nside;nj++) {
+  } // for(int ij=0;ij<int(pos.size());ij++){
   
-//   for(int nj=0;nj<nside;nj++) {
-//     if(sn[nj]>0. && sz2[nj]*sn[nj] - sz[nj]*sz[nj] !=0.) { 
-//       slp[nj] = (szxy[nj]*sn[nj] -
-// 		 sz[nj]*sxy[nj])/(sz2[nj]*sn[nj] - sz[nj]*sz[nj]);
-//       tmpslp[nj] = slp[nj]; 
-//       if(isTime) { //time offset correction
-//         // if(fabs((cval*1.e-9)*slope+1)<3.30) { 
-// 	tmpslp[nj] = -1./cval;
-// 	// }
-//       }
-//       intersect[nj] = sxy[nj]/sn[nj] - tmpslp[nj]*sz[nj]/sn[nj];
+  for(int nj=0;nj<nside;nj++) {
+    if(sn[nj]>0. && sz2[nj]*sn[nj] - sz[nj]*sz[nj] !=0.) { 
+      slp[nj] = (szxy[nj]*sn[nj] -
+                 sz[nj]*sxy[nj])/(sz2[nj]*sn[nj] - sz[nj]*sz[nj]);
+      tmpslp[nj] = slp[nj]; 
+      if(isTime) { //time offset correction
+        // if(fabs((cval*1.e-9)*slope+1)<3.30) { 
+        tmpslp[nj] = -1./cval_mps;
+        // }
+      }
+      intersect[nj] = sxy[nj]/sn[nj] - tmpslp[nj]*sz[nj]/sn[nj];
 
-//       double determ = (sn[nj]*sz2[nj] - sz[nj]*sz[nj]);
-//       errcst[nj] = sz2[nj]/determ;
-//       errcov[nj] = -sz[nj]/determ;
-//       errlin[nj] = sn[nj]/determ;
-//     }
-//   } // for(int nj=0;nj<nside;nj++) {
-//   slope.SetX(tmpslp[0]);
-//   slope.SetY(tmpslp[1]);
-//   inter.SetX(intersect[0]);
-//   inter.SetY(intersect[1]);
+      double determ = (sn[nj]*sz2[nj] - sz[nj]*sz[nj]);
+      errcst[nj] = sz2[nj]/determ;
+      errcov[nj] = -sz[nj]/determ;
+      errlin[nj] = sn[nj]/determ;
+    }
+  } // for(int nj=0;nj<nside;nj++) {
+  slope.SetX(tmpslp[0]);
+  slope.SetY(tmpslp[1]);
+  inter.SetX(intersect[0]);
+  inter.SetY(intersect[1]);
   
-//   // theta = atan(sqrt(pow(tmpslp[0],2.)+pow(tmpslp[1],2.)));
-//   // phi = atan2(tmpslp[1],tmpslp[0]);
+  // theta = atan(sqrt(pow(tmpslp[0],2.)+pow(tmpslp[1],2.)));
+  // phi = atan2(tmpslp[1],tmpslp[0]);
   
-//   double sumx = 0, sumy = 0;
-//   ext.clear(); exterr.clear();
-//   TVector3 xxt;
-//   TVector3 xxtt;
-//   for(int ij=0;ij<int(pos.size());ij++){
-//     xxt.SetX(tmpslp[0]*pos[ij].Z()+intersect[0]);
-//     xxt.SetY(tmpslp[1]*pos[ij].Z()+intersect[1]);
-//     xxt.SetZ(pos[ij].Z());
-//     ext.push_back(xxt);
-//     xxtt.SetX(errcst[0] + 2*errcov[0]*pos[ij].Z()+
-// 	      errlin[0]*pos[ij].Z()*pos[ij].Z());
-//     xxtt.SetY(errcst[1] + 2*errcov[1]*pos[ij].Z()+
-// 	      errlin[1]*pos[ij].Z()*pos[ij].Z());
-//     exterr.push_back(xxtt);
-//     // cout << " " << int(exterr.size())
-//     // 	 << " " << 1./exterr.back().X()
-//     // 	 << " " << 1./exterr.back().Y() << endl;
-//     if(int(occulay.size())==0 || occulay[ij]) {
-//       sumx += pow(xxt.X()-pos[ij].X(), 2.)/poserr[ij].X(); 
-//       sumy += pow(xxt.Y()-pos[ij].Y(), 2.)/poserr[ij].Y(); 
-//     }
-//   } // for(int ij=0;ij<int(pos.size());ij++){
-//   chi2.SetX(sumx);
-//   chi2.SetY(sumy);
-// };
+  double sumx = 0, sumy = 0;
+  ext.clear(); exterr.clear();
+  TVector3 xxt;
+  TVector3 xxtt;
+  for(int ij=0;ij<int(pos.size());ij++){
+    xxt.SetX(tmpslp[0]*pos[ij].Z()+intersect[0]);
+    xxt.SetY(tmpslp[1]*pos[ij].Z()+intersect[1]);
+    xxt.SetZ(pos[ij].Z());
+    ext.push_back(xxt);
+    xxtt.SetX(errcst[0] + 2*errcov[0]*pos[ij].Z()+
+              errlin[0]*pos[ij].Z()*pos[ij].Z());
+    xxtt.SetY(errcst[1] + 2*errcov[1]*pos[ij].Z()+
+              errlin[1]*pos[ij].Z()*pos[ij].Z());
+    exterr.push_back(xxtt);
+    // cout << " " << int(exterr.size())
+    // 	 << " " << 1./exterr.back().X()
+    // 	 << " " << 1./exterr.back().Y() << endl;
+    if(int(occulay.size())==0 || occulay[ij]) {
+      sumx += pow(xxt.X()-pos[ij].X(), 2.)/poserr[ij].X(); 
+      sumy += pow(xxt.Y()-pos[ij].Y(), 2.)/poserr[ij].Y(); 
+    }
+  } // for(int ij=0;ij<int(pos.size());ij++){
+  chi2.SetX(sumx);
+  chi2.SetY(sumy);
+};
 
 
 volatile sig_atomic_t stopFlag = 0; // Global flag to detect Ctrl+C
@@ -296,17 +296,17 @@ int main(int argc, char** argv) {
           if((event->xydata[nj][ij]>>kl)&0x01)
             inoEvent->addHit(INO::StripId{0,0,0,ij,nj,kl});
 
-    for (const auto* hit : inoEvent->getHits()) {
-      INO::StripId stripId = hit->stripId;
-      auto it = constantStripTimeDelay.find(stripId);
-      if (it == constantStripTimeDelay.end()) {
-        std::string stripName = INO::getStripName(stripId).c_str();
-        constantStripTimeDelay[stripId] = new TH1D(stripName.c_str(), stripName.c_str(), 200, -312.5, -212.5);
-        constantStripTimeDelay[stripId]->SetDirectory(0);
-      }
-      for (auto time : inoEvent->getRawLeadingTimes(stripId))
-        constantStripTimeDelay[stripId]->Fill(time);
-    }
+    // for (const auto* hit : inoEvent->getHits()) {
+    //   INO::StripId stripId = hit->stripId;
+    //   auto it = constantStripTimeDelay.find(stripId);
+    //   if (it == constantStripTimeDelay.end()) {
+    //     std::string stripName = INO::getStripName(stripId).c_str();
+    //     constantStripTimeDelay[stripId] = new TH1D(stripName.c_str(), stripName.c_str(), 200, -312.5, -212.5);
+    //     constantStripTimeDelay[stripId]->SetDirectory(0);
+    //   }
+    //   for (auto time : inoEvent->getRawLeadingTimes(stripId))
+    //     constantStripTimeDelay[stripId]->Fill(time);
+    // }
 
     std::shared_ptr<INO::INOTimeGroupingModule> inoTimeGrouping = std::make_shared<INO::INOTimeGroupingModule>(inoEvent);
     // inoTimeGrouping->process();

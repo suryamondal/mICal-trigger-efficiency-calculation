@@ -4,6 +4,8 @@
 #include <string>
 #include <iostream>
 
+#include "TVector3.h"
+
 #include "INOStructs.h"
 
 namespace INO {
@@ -12,11 +14,11 @@ namespace INO {
   public:
     static INOCalibrationManager& getInstance();
 
-    void setStripTimeOffset(const StripId& stripId, double start, double end, double value);
-    double getStripTimeOffset(const StripId& stripId, double time) const;
+    // void setStripTimeOffset(const StripId& stripId, double start, double end, double value);
+    double getStripTimeDelay(const StripId& stripId, double time) const;
 
-    void setStripPositionCorrection(const StripId& stripId, int position, double start, double end, double value);
-    double getStripPositionCorrection(const StripId& stripId, int position, double time) const;
+    // void setStripPositionCorrection(const StripId& stripId, int position, double start, double end, double value);
+    void getLayerPosition(const StripId& stripId, const double& pos, TVector3 position, TVector3 orientation) const;
 
   private:
     INOCalibrationManager();
