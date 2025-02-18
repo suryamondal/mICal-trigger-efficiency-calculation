@@ -273,9 +273,9 @@ int main(int argc, char** argv) {
     evesepFill = inoEvent->getEventTime() - evetimeFill;
     evetimeFill = inoEvent->getEventTime();
 
-// #ifdef isDebug
-//     cout << " time " << eventTime << endl;
-// #endif  // #ifdef isDebug
+    // #ifdef isDebug
+    //     cout << " time " << eventTime << endl;
+    // #endif  // #ifdef isDebug
 
     // setting rawTDCs
     for(int ij=0;ij<nlayer;ij++)
@@ -311,26 +311,53 @@ int main(int argc, char** argv) {
     std::shared_ptr<INO::INOTimeGroupingModule> inoTimeGrouping = std::make_shared<INO::INOTimeGroupingModule>(inoEvent);
     // inoTimeGrouping->process();
 
-    #ifdef isDebug
-        for (const auto* hit : inoEvent->getHits()) {
-          INO::StripId stripId = hit->stripId;
-          double calibratedTime = inoEvent->getCalibratedLeadingTimes(stripId)[0];
-          double low = inoEvent->getLowestCalibratedLeadingTime();
-          double high = inoEvent->getHighestCalibratedLeadingTime();
-          std::cout << std::setw(10) << "Module: " << stripId.module
-                    << " | Row: " << stripId.row
-                    << " | Column: " << stripId.column
-                    << " | Layer: " << stripId.layer
-                    << " | Side: " << (stripId.side ? "Y" : "X")
-                    << " | Strip: " << stripId.strip
-                    << " | Groups: " << inoEvent->getTimeGroupId(stripId).size()
-                    << " | Calibrated Time: "
-                    << std::fixed << std::setprecision(3) << calibratedTime << " ns"
-                    // << " | Low Time: " << low << " ns"
-                    // << " | High Time: " << high << " ns"
-                    << std::endl;
-        }
-    #endif
+#ifdef isDebug
+    for (const auto* hit : inoEvent->getHits()) {
+      INO::StripId stripId = hit->stripId;
+      double calibratedTime = inoEvent->getCalibratedLeadingTimes(stripId)[0];
+      double low = inoEvent->getLowestCalibratedLeadingTime();
+      double high = inoEvent->getHighestCalibratedLeadingTime();
+      std::cout << std::setw(10) << "Module: " << stripId.module
+                << " | Row: " << stripId.row
+                << " | Column: " << stripId.column
+                << " | Layer: " << stripId.layer
+                << " | Side: " << (stripId.side ? "Y" : "X")
+                << " | Strip: " << stripId.strip
+                << " | Groups: " << inoEvent->getTimeGroupId(stripId).size()
+                << " | Calibrated Time: "
+                << std::fixed << std::setprecision(3) << calibratedTime << " ns"
+        // << " | Low Time: " << low << " ns"
+        // << " | High Time: " << high << " ns"
+                << std::endl;
+    }
+#endif
+
+    std::vector<TVector3>  pos;
+    std::vector<TVector2>  poserr;
+    std::vector<bool>      occulay;
+    TVector2         slope;
+    TVector2         inter;
+    TVector2         chi2;
+    std::vector<TVector3> ext;
+    std::vector<TVector3> exterr;
+
+    for (const auto* hit : inoEvent->getHits()) {
+      INO::StripId stripId = hit->stripId;
+      int layer = hit->stripId.layer;
+      int side = hit->stripId.side;
+      int strip = hit->stripId.strip;
+      pos.push_back({
+          side ? 
+        });
+      // auto it = constantStripTimeDelay.find(stripId);
+      // if (it == constantStripTimeDelay.end()) {
+      //   std::string stripName = INO::getStripName(stripId).c_str();
+      //   constantStripTimeDelay[stripId] = new TH1D(stripName.c_str(), stripName.c_str(), 200, -312.5, -212.5);
+      //   constantStripTimeDelay[stripId]->SetDirectory(0);
+      // }
+      // for (auto time : inoEvent->getRawLeadingTimes(stripId))
+      //   constantStripTimeDelay[stripId]->Fill(time);
+    }
 
     if (stopFlag) {
       std::cout << "Exiting loop due to Ctrl+C.\n";
@@ -338,6 +365,7 @@ int main(int argc, char** argv) {
     }
 
   } // for(Long64_t iev=nentrymn;iev<nentry;iev++) {
+
   fileIn->Close();
 
   TDirectory* dir = fileOut->mkdir("ConstantStripTimeDelay");
