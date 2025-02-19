@@ -13,26 +13,26 @@ INOTimeGroupingModule::INOTimeGroupingModule(std::shared_ptr<INOEvent> data) :
   // Fill time Histogram:
   m_usedPars.tRange[0] = data->getLowestCalibratedLeadingTime();
   m_usedPars.tRange[1] = data->getHighestCalibratedLeadingTime();
-  m_usedPars.rebinningFactor = 1;
-  m_usedPars.fillSigmaN = 3.0;
+  m_usedPars.rebinningFactor = 1.0;
+  m_usedPars.fillSigmaN = 7.0;
   // Search peaks:
   m_usedPars.limitSigma[0] = 1.0;
-  m_usedPars.limitSigma[1] = 15.0;
+  m_usedPars.limitSigma[1] = 20.0;
   m_usedPars.fitRangeHalfWidth = 5.0;
-  m_usedPars.removeSigmaN = 7.;
+  m_usedPars.removeSigmaN = 7.0;
   m_usedPars.fracThreshold = 0.05;
   m_usedPars.maxGroups = 20;
   // Sort groups:
-  m_usedPars.expectedSignalTime[1] =  -500.0;
-  m_usedPars.expectedSignalTime[0] = 25000.0;
-  m_usedPars.expectedSignalTime[2] =  -250.0;
+  m_usedPars.expectedSignalTime[1] =     0.0;
+  m_usedPars.expectedSignalTime[0] =  -500.0;
+  m_usedPars.expectedSignalTime[2] = 25000.0;
   m_usedPars.signalLifetime = 25000.0;
   // Signal group selection:
-  m_usedPars.acceptSigmaN = 7.0;
+  m_usedPars.acceptSigmaN = 5.0;
   m_usedPars.writeGroupInfo = true;
   // Handle out-of-range clusters:
   m_usedPars.includeOutOfRangeClusters = true;
-  m_usedPars.clsSigma = 10.0;
+  m_usedPars.clsSigma = 3.0;
 }
 
 
@@ -44,6 +44,8 @@ void INOTimeGroupingModule::process()
   // G(cluster time, resolution)
   TH1D h_clsTime;
   createAndFillHistorgram(h_clsTime);
+
+  // h_clsTime.SaveAs("test.root");
 
   // now we search for peaks and when we find one we remove it from the distribution, one by one.
   std::vector<GroupInfo> groupInfoVector; // Gauss parameters (integral, center, sigma)
@@ -69,8 +71,8 @@ void INOTimeGroupingModule::createAndFillHistorgram(TH1D& hist)
   // minimise the range of the histogram removing empty bins at the edge
   // to speed up the execution time.
 
-  double tRangeHigh = m_usedPars.tRange[1];
-  double tRangeLow  = m_usedPars.tRange[0];
+  double tRangeHigh = m_usedPars.tRange[1] + 100.0;
+  double tRangeLow  = m_usedPars.tRange[0] - 100.0;
 
   int nBin = tRangeHigh - tRangeLow;
   if (nBin < 1) nBin = 1;
@@ -115,8 +117,6 @@ void INOTimeGroupingModule::searchGausPeaksInHistogram(TH1D& hist, std::vector<G
       maxPeak = maxBinContent;
     // we are done if the the height of the this peak is below threshold
     if (maxPeak != 0 && maxBinContent < maxPeak * m_usedPars.fracThreshold) { amDone = true; continue;}
-
-
 
     // preparing the gauss function for fitting the peak
     TF1 ngaus("ngaus", myGaus,
@@ -166,14 +166,13 @@ void INOTimeGroupingModule::searchGausPeaksInHistogram(TH1D& hist, std::vector<G
       // we are done if the the integral of the this peak is below threshold
       if (maxIntegral != 0 && pars[0] < maxIntegral * m_usedPars.fracThreshold) { amDone = true; continue;}
 
-
       // now subtract the fitted gaussian from the histogram
       subtractGausFromHistogram(hist, pars[0], pars[1], pars[2], m_usedPars.removeSigmaN);
 
       // store group information (integral, position, width)
       groupInfoVector.push_back(GroupInfo(pars[0], pars[1], pars[2]));
-      // B2DEBUG(21, " group " << int(groupInfoVector.size())
-      //         << " pars[0] " << pars[0] << " pars[1] " << pars[1] << " pars[2] " << pars[2]);
+      // std::cout << " group " << int(groupInfoVector.size())
+      //           << " pars[0] " << pars[0] << " pars[1] " << pars[1] << " pars[2] " << pars[2] << std::endl;
 
       if (int(groupInfoVector.size()) >= m_usedPars.maxGroups) { amDone = true; continue;}
 
@@ -305,14 +304,10 @@ void INOTimeGroupingModule::assignGroupIdsToClusters(TH1D& hist, std::vector<Gro
           if (m_usedPars.writeGroupInfo)
             m_inoEvent->setTimeGroupInfo(stripId).push_back(GroupInfo(pars[0], pars[1], pars[2]));
 
-          // B2DEBUG(29, "   accepted cluster " << jk
-          //         << " stripTime " << stripTime
-          //         << " GroupId " << m_svdClusters[jk]->getTimeGroupId().back());
+          // std::cout << "   accepted cluster " << " stripTime " << stripTime
+          //           << " GroupId " << m_inoEvent->getTimeGroupId(stripId).back() << std::endl;
 
         } else {
-
-          // B2DEBUG(29, "     rejected cluster " << jk
-          //         << " stripTime " << stripTime);
 
           if (ij == int(groupInfoVector.size()) - 1 && // we are now at the last loop
               int(m_inoEvent->getTimeGroupId(stripId).size()) == 0) { // leftover clusters
@@ -324,8 +319,8 @@ void INOTimeGroupingModule::assignGroupIdsToClusters(TH1D& hist, std::vector<Gro
             else
               m_inoEvent->setTimeGroupId(stripId).push_back(-1);               // orphan
 
-            // B2DEBUG(29, "     leftover cluster " << jk
-            //         << " GroupId " << m_svdClusters[jk]->getTimeGroupId().back());
+            // std::cout << "     leftover cluster " << " stripTime " << stripTime
+            //           << " GroupId " << m_inoEvent->getTimeGroupId(stripId).back() << std::endl;
 
           }
         }

@@ -59,7 +59,7 @@ void INOCalibrationManager::setStripTimeDelay(const StripId& stripId, double val
 double INOCalibrationManager::getStripTimeDelay(const StripId& stripId) const {
   std::string sql = "SELECT Value FROM StripTimeDelay WHERE "
                     "Module=? AND Row=? AND Column=? "
-                    "AND Layer=? AND Side=? AND Strip=? ORDER BY Start DESC LIMIT 1;";
+                    "AND Layer=? AND Side=? AND Strip=?;";
   sqlite3_stmt* stmt;
   double value = 0.0;
   if (sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, nullptr) == SQLITE_OK) {

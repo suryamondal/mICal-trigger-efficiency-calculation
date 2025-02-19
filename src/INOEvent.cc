@@ -23,7 +23,7 @@ namespace INO {
         rawHit.rawTimes[timeType] = rawTDCs[timeType][tdcId];
       for (auto rawTime : rawHit.rawTimes[timeType])
         rawHit.calibratedTimes[timeType].push_back(rawTime - inoCalibrationManager.getStripTimeDelay(stripId));
-      // std::cout << getEventTime() << " " << inoCalibrationManager.getStripTimeOffset(stripId, getEventTime()) << std::endl;
+      // std::cout << inoCalibrationManager.getStripTimeDelay(stripId) << std::endl;
     }
     rawHits[stripId] = rawHit; 
   }

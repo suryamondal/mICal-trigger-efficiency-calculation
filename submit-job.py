@@ -10,7 +10,8 @@ import re
 ROOT_DIR = "/media/surya/Surya_1/DaqMadurai/maduraiData_mICAL/SuryaFormat"
 FILE_REGEX = "SNM_RPC*.root"
 OUTPUT_DIR = "output"
-EXECUTABLE = "build/time-alignment"
+# EXECUTABLE = "build/time-alignment"
+EXECUTABLE = "build/grouping-and-efficiency"
 # OUTPUT_DIR = "input/corry-input"
 # EXECUTABLE = "build/createTTreeForCorry"
 SPLIT_SIZE = 10000
