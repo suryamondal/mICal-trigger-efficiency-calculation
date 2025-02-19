@@ -261,6 +261,7 @@ int main(int argc, char** argv) {
 
   std::map<INO::StripId, TH1D*> stripTimeDelay;
   std::map<INO::SideId, TH1D*> positionResidual;
+  std::map<INO::SideId, TH2D*> layerEfficiency;
   std::map<std::string, TH1D*> eventMetaHistograms;
 
   TFile* fileIn = new TFile(datafile, "read");
@@ -475,7 +476,12 @@ int main(int argc, char** argv) {
   } // for(Long64_t iev=nentrymn;iev<nentry;iev++) {
   fileIn->Close();
 
-  TDirectory* dir = fileOut->mkdir("PositionResidual");
+  TDirectory* dir = fileOut->mkdir("EventMeta");
+  dir->cd();
+  for (auto& item : eventMetaHistograms)
+    if(item.second)
+      item.second->Write();
+  dir = fileOut->mkdir("PositionResidual");
   dir->cd();
   for (auto& item : positionResidual)
     if(item.second)
@@ -483,11 +489,6 @@ int main(int argc, char** argv) {
   dir = fileOut->mkdir("StripTimeDelay");
   dir->cd();
   for (auto& item : stripTimeDelay)
-    if(item.second)
-      item.second->Write();
-  dir = fileOut->mkdir("EventMeta");
-  dir->cd();
-  for (auto& item : eventMetaHistograms)
     if(item.second)
       item.second->Write();
   fileOut->Close();
