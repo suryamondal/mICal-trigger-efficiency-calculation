@@ -2,6 +2,7 @@
 
 #include <memory>
 #include <unordered_map>
+#include <map>
 #include <vector>
 #include <string>
 #include <TFile.h>
@@ -20,9 +21,12 @@ namespace INO {
     void closeRootFile(const std::string& name);
     
     // Methods to associate objects with ROOT files
-    void addTree(const std::string& filename, TTree* tree);
-    void addHistogram(const std::string& filename, TH1* hist);
-    void addGraph(const std::string& filename, TGraph* graph);
+    void addTree(const std::string& filename,
+                 const std::string& directory, TTree* tree);
+    void addHistogram(const std::string& filename,
+                 const std::string& directory, TH1* hist);
+    void addGraph(const std::string& filename,
+                 const std::string& directory, TGraph* graph);
 
     ~INOStorageManager();
 
@@ -33,9 +37,9 @@ namespace INO {
 
     struct RootFileData {
       TFile* file;
-      std::vector<TTree*> trees;
-      std::vector<TH1*> histograms;
-      std::vector<TGraph*> graphs;
+      std::map<std::string, std::vector<TTree*>> trees;
+      std::map<std::string, std::vector<TH1*>> histograms;
+      std::map<std::string, std::vector<TGraph*>> graphs;
     };
 
     std::unordered_map<std::string, RootFileData> rootFiles;

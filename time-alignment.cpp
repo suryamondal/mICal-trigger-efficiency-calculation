@@ -1,6 +1,6 @@
 
 
-#define isDebug
+// #define isDebug
 
 #include <iostream>
 #include <fstream>
@@ -56,7 +56,7 @@ const double     tdc_least     =   0.1;	 // in ns
 const double     stripwidth     =   0.03; // in m
 
 const double     maxtime       =  22.e3;      // in ns
-const double     spdl          =   5.;	      // ns/m
+const double     spdl_mps      =   0.2;	      // m/ns
 const double     cval_mpns     =   0.29979;   // light speed in m/ns
 const double     cval_mps      =   0.29979e9; /* light speed in m/s */
 
@@ -242,18 +242,24 @@ int main(int argc, char** argv) {
 
   INO::INOCalibrationManager& inoCalibrationManager = INO::INOCalibrationManager::getInstance();
 
+  // INO::INOStorageManager& inoStorageManager = INO::INOStorageManager::getInstance();
 
-  char datafile[300] = {};
-  strncpy(datafile,argv[1],300);
-  char outfile[300] = {};
-  strncpy(outfile,argv[2],300);
+
+  char datafile[1000] = {};
+  strncpy(datafile,argv[1],1000);
+  char outfile[1000] = {};
+  strncpy(outfile,argv[2],1000);
   Long64_t nentrymn = stoi(argv[3]);
   Long64_t nentrymx = stoi(argv[4]);
 
   TFile* fileOut = new TFile((std::string(outfile) + ".root").c_str(), "recreate");
-  fileOut->cd();
+  // fileOut->cd();
 
-  std::map<INO::StripId, TH1D*> constantStripTimeDelay;
+  // auto fileOut = inoStorageManager.getRootFile(std::string(outfile) + ".root", "recreate");
+  // if(!fileOut) return 0;
+
+  std::map<INO::StripId, TH1D*> stripTimeDelay;
+  std::map<INO::SideId, TH1D*> positionResidual;
 
   TFile* fileIn = new TFile(datafile, "read");
 
@@ -350,20 +356,19 @@ int main(int argc, char** argv) {
       if(!int(inoEvent->getCalibratedLeadingTimes(stripId).size())) continue;
       if (std::fabs(inoEvent->getCalibratedLeadingTimes(stripId)[0] - expectedEventTime) > triggerWindow * 0.5) continue;
       stripHits[hit->stripId.side][{hit->stripId.module,
-	    hit->stripId.row,
-	    hit->stripId.column,
-	    hit->stripId.layer}] = hit->stripId.strip;
+            hit->stripId.row,
+            hit->stripId.column,
+            hit->stripId.layer}] = hit->stripId.strip;
     }
     std::vector<INO::PixelId> allPixels;
     for (auto xStripHit : stripHits[0])
       for (auto yStripHit : stripHits[1])
-	if (xStripHit.first == yStripHit.first)
-	  allPixels.push_back({xStripHit.first.module,
-		xStripHit.first.row,
-		xStripHit.first.column,
-		xStripHit.first.layer,
-		{xStripHit.second, yStripHit.second}
-	    });
+        if (xStripHit.first == yStripHit.first)
+          allPixels.push_back({xStripHit.first.module,
+                               xStripHit.first.row,
+                               xStripHit.first.column,
+                               xStripHit.first.layer,
+                               {xStripHit.second, yStripHit.second} });
 
     std::vector<TVector3>  pos;
     std::vector<TVector2>  poserr;
@@ -373,52 +378,83 @@ int main(int argc, char** argv) {
     TVector2         chi2;
     std::vector<TVector3> ext;
     std::vector<TVector3> exterr;
-
     for (auto pixel : allPixels) {
       TVector3 rawPos = {(pixel.strip[0] + 0.5) * stripwidth,
-			 (pixel.strip[1] + 0.5) * stripwidth,
-			 getLayerZ(pixel.layer)};
+                         (pixel.strip[1] + 0.5) * stripwidth,
+                         getLayerZ(pixel.layer)};
       TVector3 rpcPosition, rpcOrientation;
-      inoCalibrationManager.getLayerPosition({
-	  pixel.module, pixel.row, pixel.column, pixel.layer},
-	pixel.strip[0] < 32 ? 0 : 1,
-	pixel.strip[1] < 32 ? 0 : 1,
-	rpcPosition, rpcOrientation);
-      rpcPosition *= 0.01; rpcPosition.SetZ(0);
+      inoCalibrationManager
+        .getLayerPosition({pixel.module, pixel.row, pixel.column,
+                           pixel.layer},
+          pixel.strip[0] < 32 ? 0 : 1,
+          pixel.strip[1] < 32 ? 0 : 1,
+          rpcPosition, rpcOrientation);
+      rpcPosition.SetZ(0);
       rawPos += rpcPosition;
-      rawPos.RotateX(rpcOrientation.X() * TMath::DegToRad());
-      rawPos.RotateY(rpcOrientation.Y() * TMath::DegToRad());
-      rawPos.RotateZ(rpcOrientation.Z() * TMath::DegToRad());
-      pos.push_back(rawPos);
-      poserr.push_back({0.008, 0.008});
-    }
-    LinearVectorFit(0, pos, poserr, occulay, slope, inter, chi2, ext, exterr);
-
-#ifdef isDebug
-    for (auto extHit : ext) {
-      TVector3 rawPos = extHit;
-      int layer = getILayer(extHit.Z());
-      int xstrip = int(extHit.X() / stripwidth);
-      int ystrip = int(extHit.Y() / stripwidth);
-      TVector3 rpcPosition, rpcOrientation;
-      inoCalibrationManager.getLayerPosition({
-	  0, 0, 0, layer},
-	xstrip < 32 ? 0 : 1,
-	ystrip < 32 ? 0 : 1,
-	rpcPosition, rpcOrientation);
-      rpcPosition *= 0.01; rpcPosition.SetZ(0);
-      rawPos -= rpcPosition;
       rawPos.RotateX(-rpcOrientation.X() * TMath::DegToRad());
       rawPos.RotateY(-rpcOrientation.Y() * TMath::DegToRad());
       rawPos.RotateZ(-rpcOrientation.Z() * TMath::DegToRad());
       pos.push_back(rawPos);
       poserr.push_back({0.008, 0.008});
-      std::cout << " extX " << extHit.X() / stripwidth
-		<< " extY " << extHit.Y() / stripwidth
-		<< " extZ " << layer
-		<< std::endl; 
     }
+    LinearVectorFit(0, pos, poserr, occulay, slope, inter, chi2, ext, exterr);
+
+    for (auto extHit : ext) {
+      int layer = getILayer(extHit.Z());
+      for (auto pixel : allPixels) {
+        if (layer != pixel.layer) continue;
+        TVector3 rawPos = {(pixel.strip[0] + 0.5) * stripwidth,
+                           (pixel.strip[1] + 0.5) * stripwidth,
+                           getLayerZ(pixel.layer)};
+        TVector3 rpcPosition, rpcOrientation;
+        inoCalibrationManager
+          .getLayerPosition({pixel.module, pixel.row, pixel.column,
+                             pixel.layer},
+            pixel.strip[0] < 32 ? 0 : 1,
+            pixel.strip[1] < 32 ? 0 : 1,
+            rpcPosition, rpcOrientation);
+        rpcPosition.SetZ(0);
+        rawPos += rpcPosition;
+        rawPos.RotateX(-rpcOrientation.X() * TMath::DegToRad());
+        rawPos.RotateY(-rpcOrientation.Y() * TMath::DegToRad());
+        rawPos.RotateZ(-rpcOrientation.Z() * TMath::DegToRad());
+        for (int nj : {0, 1}) {
+          // position
+          INO::SideId sideId = {pixel.module, pixel.row, pixel.column, layer, nj};
+          auto it = positionResidual.find(sideId);
+          if (it == positionResidual.end()) {
+            std::string sideName = INO::getSideName(sideId);
+            positionResidual[sideId] = new TH1D(sideName.c_str(),
+                                                sideName.c_str(),
+                                                500, -0.25, 0.25);
+            positionResidual[sideId]->SetDirectory(0);
+          }
+          positionResidual[sideId]->Fill(extHit[nj] - rawPos[nj]);
+          // time
+          INO::StripId stripId = {pixel.module, pixel.row, pixel.column,
+                                  layer, nj, pixel.strip[nj]};
+          auto itt = stripTimeDelay.find(stripId);
+          if (itt == stripTimeDelay.end()) {
+            std::string stripName = INO::getStripName(stripId);
+            stripTimeDelay[stripId] = new TH1D(stripName.c_str(),
+                                               stripName.c_str(),
+                                               200, -312.5, -212.5);
+            stripTimeDelay[stripId]->SetDirectory(0);
+          }
+          if(int(inoEvent->getCalibratedLeadingTimes(stripId).size())) {
+            double time = inoEvent->getCalibratedLeadingTimes(stripId)[0];
+            time -= extHit[!nj] / spdl_mps;
+            stripTimeDelay[stripId]->Fill(time);
+          }
+        }
+      }
+#ifdef isDebug
+      std::cout << " extX " << extHit.X() / stripwidth
+                << " extY " << extHit.Y() / stripwidth
+                << " extZ " << layer
+                << std::endl; 
 #endif
+    }
 
     if (stopFlag) {
       std::cout << "Exiting loop due to Ctrl+C.\n";
@@ -426,22 +462,26 @@ int main(int argc, char** argv) {
     }
 
   } // for(Long64_t iev=nentrymn;iev<nentry;iev++) {
-
   fileIn->Close();
 
-  TDirectory* dir = fileOut->mkdir("ConstantStripTimeDelay");
+  TDirectory* dir = fileOut->mkdir("PositionResidual");
   dir->cd();
-  for (auto& item : constantStripTimeDelay) {
+  for (auto& item : positionResidual)
     if(item.second)
       item.second->Write();
-  }
-
+  dir = fileOut->mkdir("StripTimeDelay");
+  dir->cd();
+  for (auto& item : stripTimeDelay)
+    if(item.second)
+      item.second->Write();
   fileOut->Close();
 
-  for (auto& item : constantStripTimeDelay) {
+  for (auto& item : stripTimeDelay)
     if(item.second)
       delete item.second;
-  }
+  for (auto& item : positionResidual)
+    if(item.second)
+      delete item.second;
 
   return 0;
 }; // main

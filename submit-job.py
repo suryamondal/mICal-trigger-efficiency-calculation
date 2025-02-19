@@ -9,13 +9,13 @@ import re
 # Configuration
 ROOT_DIR = "/media/surya/Surya_1/DaqMadurai/maduraiData_mICAL/SuryaFormat"
 FILE_REGEX = "SNM_RPC*.root"
-# OUTPUT_DIR = "output"
-# EXECUTABLE = "build/alignment"
-OUTPUT_DIR = "input/corry-input"
-EXECUTABLE = "build/createTTreeForCorry"
+OUTPUT_DIR = "output"
+EXECUTABLE = "build/time-alignment"
+# OUTPUT_DIR = "input/corry-input"
+# EXECUTABLE = "build/createTTreeForCorry"
 SPLIT_SIZE = 10000
-MAX_WORKERS = 10
-MAX_FILES = 1
+MAX_WORKERS = 6
+MAX_FILES = 20
 
 class EventCounter:
     def __init__(self):
@@ -176,7 +176,7 @@ def merge_files_by_date():
 def main():
 
     submit_jobs();
-    merge_files_by_date()
+    # merge_files_by_date()
 
 if __name__ == "__main__":
     main()
