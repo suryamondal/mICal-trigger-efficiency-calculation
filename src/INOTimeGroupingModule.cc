@@ -20,13 +20,13 @@ INOTimeGroupingModule::INOTimeGroupingModule(std::shared_ptr<INOEvent> data) :
   m_usedPars.limitSigma[1] = 20.0;
   m_usedPars.fitRangeHalfWidth = 5.0;
   m_usedPars.removeSigmaN = 7.0;
-  m_usedPars.fracThreshold = 0.05;
+  m_usedPars.fracThreshold = 0.25;
   m_usedPars.maxGroups = 20;
   // Sort groups:
   m_usedPars.expectedSignalTime[1] =     0.0;
-  m_usedPars.expectedSignalTime[0] =  -500.0;
-  m_usedPars.expectedSignalTime[2] = 25000.0;
-  m_usedPars.signalLifetime = 25000.0;
+  m_usedPars.expectedSignalTime[0] =  -1000.0;
+  m_usedPars.expectedSignalTime[2] = 22000.0;
+  m_usedPars.signalLifetime = 50.0;
   // Signal group selection:
   m_usedPars.acceptSigmaN = 5.0;
   m_usedPars.writeGroupInfo = true;
@@ -233,14 +233,13 @@ void INOTimeGroupingModule::sortSignalGroups(std::vector<GroupInfo>& groupInfoVe
         isKeyGroupSignal = false;
       if (!isKeyGroupSignal) break; // skip the backgrounds
 
-      double keyWt = keyGroupIntegral * TMath::Exp(-std::fabs(keyGroupCenter - m_usedPars.expectedSignalTime[1]) /
-                                                   m_usedPars.signalLifetime);
+      double keyWt = TMath::Exp(-std::fabs(keyGroupCenter - m_usedPars.expectedSignalTime[1]) /
+                                m_usedPars.signalLifetime);
       int kj = ij - 1;
       while (kj >= 0) {
-        double otherGroupIntegral = std::get<0>(groupInfoVector[kj]);
         double otherGroupCenter = std::get<1>(groupInfoVector[kj]);
-        double grWt = otherGroupIntegral * TMath::Exp(-std::fabs(otherGroupCenter - m_usedPars.expectedSignalTime[1]) /
-                                                      m_usedPars.signalLifetime);
+        double grWt = TMath::Exp(-std::fabs(otherGroupCenter - m_usedPars.expectedSignalTime[1]) /
+                                 m_usedPars.signalLifetime);
         if (grWt > keyWt) break;
         groupInfoVector[kj + 1] = groupInfoVector[kj];
         kj--;

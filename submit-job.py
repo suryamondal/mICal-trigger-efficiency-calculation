@@ -14,8 +14,8 @@ OUTPUT_DIR = "output"
 EXECUTABLE = "build/grouping-and-efficiency"
 # OUTPUT_DIR = "input/corry-input"
 # EXECUTABLE = "build/createTTreeForCorry"
-SPLIT_SIZE = 10000
-MAX_WORKERS = 6
+SPLIT_SIZE = 20000
+MAX_WORKERS = 10
 MAX_FILES = 20
 
 class EventCounter:

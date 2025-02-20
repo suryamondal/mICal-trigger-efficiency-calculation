@@ -46,7 +46,8 @@ void processFiles(const std::string &filename) {
     std::cout << "m: " << m << ", r: " << r << ", c: " << c
               << ", l: " << l << ", axis: " << axis << ", s: " << s
               << ", center " << center << std::endl;
-    instance.setStripTimeDelay({m, r, c, l, axis == 'x' ? 0 : 1, s}, center);
+    double previousDelay = instance.getStripTimeDelay({m, r, c, l, axis == 'x' ? 0 : 1, s});
+    instance.setStripTimeDelay({m, r, c, l, axis == 'x' ? 0 : 1, s}, center + previousDelay);
   }
 }
 

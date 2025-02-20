@@ -342,23 +342,34 @@ int main(int argc, char** argv) {
 #endif
 
     // compute event time
-    double triggerTime = std::numeric_limits<double>::quiet_NaN();
+    double firstGroupMean = std::numeric_limits<double>::quiet_NaN();
+    double secondGroupMean = std::numeric_limits<double>::quiet_NaN();
     for (const auto* hit : inoEvent->getHits()) {
       INO::StripId stripId = hit->stripId;
       auto groupIds = inoEvent->getTimeGroupId(stripId);
-      if (!int(groupIds.size())) continue;
-      if (groupIds[0] == 0)
-        triggerTime = std::get<1>(inoEvent->getTimeGroupInfo(stripId)[0]);
+      if (int(groupIds.size()) == 1)
+        if (groupIds[0] == 0)
+          firstGroupMean = std::get<1>(inoEvent->getTimeGroupInfo(stripId)[0]);
+      if (int(groupIds.size()) == 2)
+        if (groupIds[1] == 1)
+          secondGroupMean = std::get<1>(inoEvent->getTimeGroupInfo(stripId)[1]);
     }
-    auto triggerTimeHist = eventMetaHistograms.find("triggerTime");
-    if (triggerTimeHist == eventMetaHistograms.end()) {
-      eventMetaHistograms["triggerTime"] = new TH1D("triggerTime",
-                                                    "triggerTime",
+    auto firstGroupMeanHist = eventMetaHistograms.find("firstGroupMean");
+    if (firstGroupMeanHist == eventMetaHistograms.end()) {
+      eventMetaHistograms["firstGroupMean"] = new TH1D("firstGroupMean",
+                                                    "firstGroupMean",
                                                     200, -25, 25);
-      eventMetaHistograms["triggerTime"]->SetDirectory(0);
+      eventMetaHistograms["firstGroupMean"]->SetDirectory(0);
+      eventMetaHistograms["secondGroupMean"]
+        = new TH1D("secondGroupMean",
+                   "secondGroupMean",
+                   2300, -1000, 22000);
+      eventMetaHistograms["secondGroupMean"]->SetDirectory(0);
     }
-    eventMetaHistograms["triggerTime"]->Fill(triggerTime);
-
+    if (!std::isnan(firstGroupMean))
+      eventMetaHistograms["firstGroupMean"]->Fill(firstGroupMean);
+    if (!std::isnan(secondGroupMean))
+      eventMetaHistograms["secondGroupMean"]->Fill(secondGroupMean);
 
     std::map<INO::LayerId, int> stripHits[2];
     for (const auto* hit : inoEvent->getHits()) {
