@@ -57,7 +57,7 @@ const double     tdc_least     =   0.1;	 // in ns
 const double     stripwidth     =   0.03; // in m
 
 const double     maxtime       =  22.e3;      // in ns
-const double     spdl_mps      =   0.2;	      // m/ns
+const double     spdl_mpns      =   0.2;	      // m/ns
 const double     cval_mpns     =   0.29979;   // light speed in m/ns
 const double     cval_mps      =   0.29979e9; /* light speed in m/s */
 
@@ -259,10 +259,11 @@ int main(int argc, char** argv) {
   // auto fileOut = inoStorageManager.getRootFile(std::string(outfile) + ".root", "recreate");
   // if(!fileOut) return 0;
 
+  std::map<std::string, TH1D*> eventMetaHistograms;
   std::map<INO::StripId, TH1D*> stripTimeDelay;
   std::map<INO::SideId, TH1D*> positionResidual;
   std::map<INO::SideId, TH2D*> layerEfficiency;
-  std::map<std::string, TH1D*> eventMetaHistograms;
+  std::map<INO::SideId, TH1D*> specialHistograms;
 
   TFile* fileIn = new TFile(datafile, "read");
 
@@ -347,12 +348,12 @@ int main(int argc, char** argv) {
     for (const auto* hit : inoEvent->getHits()) {
       INO::StripId stripId = hit->stripId;
       auto groupIds = inoEvent->getTimeGroupId(stripId);
-      if (int(groupIds.size()) == 1)
+      if (int(groupIds.size()) == 1) {
         if (groupIds[0] == 0)
           firstGroupMean = std::get<1>(inoEvent->getTimeGroupInfo(stripId)[0]);
-      if (int(groupIds.size()) == 2)
-        if (groupIds[1] == 1)
-          secondGroupMean = std::get<1>(inoEvent->getTimeGroupInfo(stripId)[1]);
+        if (groupIds[0] == 1)
+          secondGroupMean = std::get<1>(inoEvent->getTimeGroupInfo(stripId)[0]);
+      }
     }
     auto firstGroupMeanHist = eventMetaHistograms.find("firstGroupMean");
     if (firstGroupMeanHist == eventMetaHistograms.end()) {
@@ -375,7 +376,6 @@ int main(int argc, char** argv) {
     for (const auto* hit : inoEvent->getHits()) {
       INO::StripId stripId = hit->stripId;
       if(!int(inoEvent->getCalibratedLeadingTimes(stripId).size())) continue;
-      // if (std::fabs(inoEvent->getCalibratedLeadingTimes(stripId)[0] - expectedEventTime) > triggerWindow * 0.5) continue;
       auto groupIds = inoEvent->getTimeGroupId(stripId);
       if (std::find(groupIds.begin(), groupIds.end(), 0) == groupIds.end()) continue; // only group 0
       stripHits[hit->stripId.side][{hit->stripId.module,
@@ -420,8 +420,10 @@ int main(int argc, char** argv) {
       pos.push_back(rawPos);
       poserr.push_back({0.008, 0.008});
     }
+    if (int(pos.size()) < 5) continue;
     LinearVectorFit(0, pos, poserr, occulay, slope, inter, chi2, ext, exterr);
 
+    std::map<INO::SideId, double> layerTimes;
     for (auto extHit : ext) {
       int layer = getILayer(extHit.Z());
       for (auto pixel : allPixels) {
@@ -443,7 +445,8 @@ int main(int argc, char** argv) {
         rawPos.RotateZ(-rpcOrientation.Z() * TMath::DegToRad());
         for (int nj : {0, 1}) {
           // position
-          INO::SideId sideId = {pixel.module, pixel.row, pixel.column, layer, nj};
+          INO::SideId sideId = {pixel.module, pixel.row, pixel.column,
+                                layer, nj};
           auto it = positionResidual.find(sideId);
           if (it == positionResidual.end()) {
             std::string sideName = INO::getSideName(sideId);
@@ -461,13 +464,24 @@ int main(int argc, char** argv) {
             std::string stripName = INO::getStripName(stripId);
             stripTimeDelay[stripId] = new TH1D(stripName.c_str(),
                                                stripName.c_str(),
-                                               200, -50, 50);
+                                               200, -312.5, -212.5);
             stripTimeDelay[stripId]->SetDirectory(0);
+          }
+          if(int(inoEvent->getRawLeadingTimes(stripId).size())) {
+            double time = inoEvent->getRawLeadingTimes(stripId)[0];
+            time -= extHit[!nj] / spdl_mpns;
+            stripTimeDelay[stripId]->Fill(time);
           }
           if(int(inoEvent->getCalibratedLeadingTimes(stripId).size())) {
             double time = inoEvent->getCalibratedLeadingTimes(stripId)[0];
-            time -= extHit[!nj] / spdl_mps;
-            stripTimeDelay[stripId]->Fill(time);
+            time -= extHit[!nj] / spdl_mpns;
+            // earliest time in layer
+            auto layerTime = layerTimes.find(sideId);
+            if (layerTime != layerTimes.end()) {
+              double previousTime = layerTime->second;
+              if (previousTime > time) layerTimes[sideId] = time;
+            } else
+              layerTimes[sideId] = time;
           }
         }
       }
@@ -478,6 +492,26 @@ int main(int argc, char** argv) {
                 << std::endl; 
 #endif
     }
+
+    for (auto item : layerTimes) {
+      auto sideId = item.first;
+      int time = item.second;
+      INO::SideId checkSide = {sideId.module, sideId.row, sideId.column,
+                               sideId.layer + 1, sideId.side};
+      auto layerTime = layerTimes.find(checkSide);
+      if (layerTime != layerTimes.end()) {
+        auto itt = specialHistograms.find(sideId);
+        if (itt == specialHistograms.end()) {
+          std::string sideName = "layerTimeDifference_" + INO::getSideName(sideId);
+          specialHistograms[sideId] = new TH1D(sideName.c_str(),
+                                               sideName.c_str(),
+                                               100, -25, 25);
+          specialHistograms[sideId]->SetDirectory(0);
+        }
+        specialHistograms[sideId]->Fill(time - layerTime->second);
+      }
+    }
+
 
     if (stopFlag) {
       std::cout << "Exiting loop due to Ctrl+C.\n";
@@ -502,6 +536,11 @@ int main(int argc, char** argv) {
   for (auto& item : stripTimeDelay)
     if(item.second)
       item.second->Write();
+  dir = fileOut->mkdir("SpecialHistograms");
+  dir->cd();
+  for (auto& item : specialHistograms)
+    if(item.second)
+      item.second->Write();
   fileOut->Close();
 
   for (auto& item : stripTimeDelay)
@@ -513,7 +552,10 @@ int main(int argc, char** argv) {
   for (auto& item : eventMetaHistograms)
     if(item.second)
       delete item.second;
-
+  for (auto& item : specialHistograms)
+    if(item.second)
+      delete item.second;
+  
   return 0;
 }; // main
 

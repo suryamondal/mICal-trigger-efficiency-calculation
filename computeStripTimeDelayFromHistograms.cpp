@@ -36,18 +36,26 @@ void processFiles(const std::string &filename) {
     std::cout << histName << std::endl;
     TH1D *hist = (TH1D*)file.Get(("StripTimeDelay/" + histName).c_str());
     if (!hist) continue;
-    if (hist->GetEntries() < 100) continue;
+
+    int m, r, c, l, s; char axis;
+    std::sscanf(histName.c_str(), "m%d_r%d_c%d_l%d_%c_s%d", &m, &r, &c, &l, &axis, &s);
+    if (hist->GetEntries() < 100) {
+      instance.setStripTimeDelay({m, r, c, l, axis == 'x' ? 0 : 1, s}, -260.0);
+      continue;
+    }
     double mean = hist->GetBinCenter(hist->GetMaximumBin());
     TF1 gauss("gaus", "gaus", mean - 6, mean + 6);
     hist->Fit(&gauss, "RQ");
     double center = gauss.GetParameter(1);
-    int m, r, c, l, s; char axis;
-    std::sscanf(histName.c_str(), "m%d_r%d_c%d_l%d_%c_s%d", &m, &r, &c, &l, &axis, &s);
     std::cout << "m: " << m << ", r: " << r << ", c: " << c
               << ", l: " << l << ", axis: " << axis << ", s: " << s
               << ", center " << center << std::endl;
-    double previousDelay = instance.getStripTimeDelay({m, r, c, l, axis == 'x' ? 0 : 1, s});
-    instance.setStripTimeDelay({m, r, c, l, axis == 'x' ? 0 : 1, s}, center + previousDelay);
+    // double previousDelay = instance.getStripTimeDelay({m, r, c, l, axis == 'x' ? 0 : 1, s});
+    // double setValue = previousDelay - center;
+    // if (setValue < -300 || setValue > -220) setValue = -260;
+    // std::cout << " set value " << setValue  << std::endl;
+    // instance.setStripTimeDelay({m, r, c, l, axis == 'x' ? 0 : 1, s}, setValue);
+    instance.setStripTimeDelay({m, r, c, l, axis == 'x' ? 0 : 1, s}, center);
   }
 }
 

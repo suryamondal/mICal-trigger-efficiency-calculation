@@ -23,10 +23,10 @@ target_link_libraries(grouping-and-efficiency ROOT::Core ROOT::RIO ROOT::Tree RO
 # # Link against ROOT and MySQL libraries
 # target_link_libraries(time-alignment ROOT::Core ROOT::RIO ROOT::Tree ROOT::Hist ROOT::Physics SQLite::SQLite3)
 
-# # Add executable
-# add_executable(computeStripTimeDelayFromHistograms computeStripTimeDelayFromHistograms.cpp ${SOURCES})
-# # Link against ROOT and MySQL libraries
-# target_link_libraries(computeStripTimeDelayFromHistograms ROOT::Core ROOT::RIO ROOT::Tree ROOT::Hist SQLite::SQLite3)
+# Add executable
+add_executable(computeStripTimeDelayFromHistograms computeStripTimeDelayFromHistograms.cpp ${SOURCES})
+# Link against ROOT and MySQL libraries
+target_link_libraries(computeStripTimeDelayFromHistograms ROOT::Core ROOT::RIO ROOT::Tree ROOT::Hist SQLite::SQLite3)
 
 # # Add executable
 # add_executable(createTTreeForCorry createTTreeForCorry.cpp ${SOURCES})

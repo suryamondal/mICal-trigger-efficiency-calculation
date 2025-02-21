@@ -36,9 +36,10 @@ INOCalibrationManager& INOCalibrationManager::getInstance() {
 }
 
 void INOCalibrationManager::setStripTimeDelay(const StripId& stripId, double value) {
-  std::string sql = "INSERT INTO StripTimeDelay (Module, Row, Column, Layer, Side, Strip, Value) "
-                    "VALUES (?, ?, ?, ?, ?, ?, ?) "
-                    "ON CONFLICT(Module, Row, Column, Layer, Side, Strip) DO UPDATE SET Value=excluded.Value;";
+  sqlite3_busy_timeout(db, 5000);
+
+  std::string sql = "INSERT OR REPLACE INTO StripTimeDelay (Module, Row, Column, Layer, Side, Strip, Value) "
+    "VALUES (?, ?, ?, ?, ?, ?, ?);";
   sqlite3_stmt* stmt;
   if (sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, nullptr) == SQLITE_OK) {
     sqlite3_bind_int(stmt, 1, stripId.module);
@@ -57,6 +58,8 @@ void INOCalibrationManager::setStripTimeDelay(const StripId& stripId, double val
 }
 
 double INOCalibrationManager::getStripTimeDelay(const StripId& stripId) const {
+  sqlite3_busy_timeout(db, 5000);
+
   std::string sql = "SELECT Value FROM StripTimeDelay WHERE "
                     "Module=? AND Row=? AND Column=? "
                     "AND Layer=? AND Side=? AND Strip=?;";

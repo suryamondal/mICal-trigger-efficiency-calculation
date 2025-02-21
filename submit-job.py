@@ -16,7 +16,7 @@ EXECUTABLE = "build/grouping-and-efficiency"
 # EXECUTABLE = "build/createTTreeForCorry"
 SPLIT_SIZE = 20000
 MAX_WORKERS = 10
-MAX_FILES = 20
+MAX_FILES = 50
 
 class EventCounter:
     def __init__(self):
