@@ -77,12 +77,14 @@ const double   rpcZShift         = 0; //
 // const double   moduleDistance    = 0.;	  //
 
 
+
+
 double getLayerZ(const int& layer) {
   return (airGap + ironThickness) * layer + rpcZShift;
 };
 
 int getILayer(const double& layer) {
-  return (layer - rpcZShift) / (airGap + ironThickness);
+  return std::round((layer - rpcZShift) / (airGap + ironThickness));
 };
 
 
@@ -95,20 +97,20 @@ void LinearVectorFit(bool              isTime, // time iter
                      TVector2         &chi2,
                      std::vector<TVector3> &ext,
                      std::vector<TVector3> &exterr) {
-  
+
   double szxy[nside] = {0};
   double   sz[nside] = {0};
   double  sxy[nside] = {0};
   double   sn[nside] = {0};
   double  sz2[nside] = {0};
-  
+
   double     slp[nside] = {-10000,-10000};
   double  tmpslp[nside] = {-10000,-10000};
   double intersect[nside] = {-10000,-10000};
   double    errcst[nside] = {-10000,-10000};
   double    errcov[nside] = {-10000,-10000};
   double    errlin[nside] = {-10000,-10000};
-  
+
   for(int ij=0;ij<int(pos.size());ij++) {
     if(int(occulay.size()) && !occulay[ij]) {continue;}
     // cout << " ij " << ij << endl;
@@ -148,15 +150,15 @@ void LinearVectorFit(bool              isTime, // time iter
   slope.SetY(tmpslp[1]);
   inter.SetX(intersect[0]);
   inter.SetY(intersect[1]);
-  
+
   // theta = atan(sqrt(pow(tmpslp[0],2.)+pow(tmpslp[1],2.)));
   // phi = atan2(tmpslp[1],tmpslp[0]);
-  
+
   double sumx = 0, sumy = 0;
   ext.clear(); exterr.clear();
-  TVector3 xxt;
-  TVector3 xxtt;
   for(int ij=0;ij<int(pos.size());ij++){
+    TVector3 xxt;
+    TVector3 xxtt;
     xxt.SetX(tmpslp[0]*pos[ij].Z()+intersect[0]);
     xxt.SetY(tmpslp[1]*pos[ij].Z()+intersect[1]);
     xxt.SetZ(pos[ij].Z());
@@ -358,8 +360,8 @@ int main(int argc, char** argv) {
     auto firstGroupMeanHist = eventMetaHistograms.find("firstGroupMean");
     if (firstGroupMeanHist == eventMetaHistograms.end()) {
       eventMetaHistograms["firstGroupMean"] = new TH1D("firstGroupMean",
-                                                    "firstGroupMean",
-                                                    200, -25, 25);
+                                                       "firstGroupMean",
+                                                       200, -25, 25);
       eventMetaHistograms["firstGroupMean"]->SetDirectory(0);
       eventMetaHistograms["secondGroupMean"]
         = new TH1D("secondGroupMean",
@@ -372,26 +374,39 @@ int main(int argc, char** argv) {
     if (!std::isnan(secondGroupMean))
       eventMetaHistograms["secondGroupMean"]->Fill(secondGroupMean);
 
-    std::map<INO::LayerId, int> stripHits[2];
+    std::map<INO::SideId, std::vector<INO::StripId>> stripHits;
     for (const auto* hit : inoEvent->getHits()) {
       INO::StripId stripId = hit->stripId;
       if(!int(inoEvent->getCalibratedLeadingTimes(stripId).size())) continue;
       auto groupIds = inoEvent->getTimeGroupId(stripId);
       if (std::find(groupIds.begin(), groupIds.end(), 0) == groupIds.end()) continue; // only group 0
-      stripHits[hit->stripId.side][{hit->stripId.module,
+      stripHits[{hit->stripId.module,
             hit->stripId.row,
             hit->stripId.column,
-            hit->stripId.layer}] = hit->stripId.strip;
+            hit->stripId.layer,
+            hit->stripId.side}].push_back(hit->stripId);
     }
+    if (int(stripHits.size()) < 10) continue;
     std::vector<INO::PixelId> allPixels;
-    for (auto xStripHit : stripHits[0])
-      for (auto yStripHit : stripHits[1])
-        if (xStripHit.first == yStripHit.first)
-          allPixels.push_back({xStripHit.first.module,
-                               xStripHit.first.row,
-                               xStripHit.first.column,
-                               xStripHit.first.layer,
-                               {xStripHit.second, yStripHit.second} });
+    for (auto stripHit : stripHits) {
+      if (int(stripHit.second.size()) > 5) continue;
+      auto sideId = stripHit.first;
+      auto it = stripHits.find({sideId.module,
+                                sideId.row,
+                                sideId.column,
+                                sideId.layer,
+                                !sideId.side});
+      if (it != stripHits.end())
+        for (auto strip1 : stripHit.second)
+          for (auto strip2 : it->second)
+            allPixels.push_back({sideId.module,
+                                 sideId.row,
+                                 sideId.column,
+                                 sideId.layer,
+                                 {sideId.side ? strip2.strip : strip1.strip,
+                                  sideId.side ? strip1.strip : strip2.strip} });
+    }
+    // std::cout << " total pixels " << allPixels.size() << endl;
 
     std::vector<TVector3>  pos;
     std::vector<TVector2>  poserr;
@@ -401,6 +416,7 @@ int main(int argc, char** argv) {
     TVector2         chi2;
     std::vector<TVector3> ext;
     std::vector<TVector3> exterr;
+    pos.clear(); poserr.clear(); occulay.clear();
     for (auto pixel : allPixels) {
       TVector3 rawPos = {(pixel.strip[0] + 0.5) * stripwidth,
                          (pixel.strip[1] + 0.5) * stripwidth,
@@ -414,14 +430,25 @@ int main(int argc, char** argv) {
           rpcPosition, rpcOrientation);
       rpcPosition.SetZ(0);
       rawPos += rpcPosition;
-      rawPos.RotateX(-rpcOrientation.X() * TMath::DegToRad());
-      rawPos.RotateY(-rpcOrientation.Y() * TMath::DegToRad());
-      rawPos.RotateZ(-rpcOrientation.Z() * TMath::DegToRad());
+      rawPos.RotateX(rpcOrientation.X() * TMath::DegToRad());
+      rawPos.RotateY(rpcOrientation.Y() * TMath::DegToRad());
+      rawPos.RotateZ(rpcOrientation.Z() * TMath::DegToRad());
       pos.push_back(rawPos);
       poserr.push_back({0.008, 0.008});
     }
-    if (int(pos.size()) < 5) continue;
     LinearVectorFit(0, pos, poserr, occulay, slope, inter, chi2, ext, exterr);
+
+#ifdef isDebug
+    for (int ij=0;ij<int(pos.size());ij++)
+      std::cout << " X " << pos[ij].X() / stripwidth
+                << " Y " << pos[ij].Y() / stripwidth
+                << " extX " << ext[ij].X() / stripwidth
+                << " extY " << ext[ij].Y() / stripwidth
+                << " layer " << ext[ij].Z()
+                << " layerI " << getILayer(ext[ij].Z())
+                << std::endl;
+#endif
+
 
     std::map<INO::SideId, double> layerTimes;
     for (auto extHit : ext) {
@@ -440,9 +467,9 @@ int main(int argc, char** argv) {
             rpcPosition, rpcOrientation);
         rpcPosition.SetZ(0);
         rawPos += rpcPosition;
-        rawPos.RotateX(-rpcOrientation.X() * TMath::DegToRad());
-        rawPos.RotateY(-rpcOrientation.Y() * TMath::DegToRad());
-        rawPos.RotateZ(-rpcOrientation.Z() * TMath::DegToRad());
+        rawPos.RotateX(rpcOrientation.X() * TMath::DegToRad());
+        rawPos.RotateY(rpcOrientation.Y() * TMath::DegToRad());
+        rawPos.RotateZ(rpcOrientation.Z() * TMath::DegToRad());
         for (int nj : {0, 1}) {
           // position
           INO::SideId sideId = {pixel.module, pixel.row, pixel.column,
@@ -485,12 +512,6 @@ int main(int argc, char** argv) {
           }
         }
       }
-#ifdef isDebug
-      std::cout << " extX " << extHit.X() / stripwidth
-                << " extY " << extHit.Y() / stripwidth
-                << " extZ " << layer
-                << std::endl; 
-#endif
     }
 
     for (auto item : layerTimes) {
@@ -511,6 +532,18 @@ int main(int argc, char** argv) {
         specialHistograms[sideId]->Fill(time - layerTime->second);
       }
     }
+
+
+    // time fit
+    std::vector<TVector3>  time_pos;
+    std::vector<TVector2>  time_poserr;
+    std::vector<bool>      time_occulay;
+    TVector2         time_slope;
+    TVector2         time_inter;
+    TVector2         time_chi2;
+    std::vector<TVector3> time_ext;
+    std::vector<TVector3> time_exterr;
+    time_pos.clear(); time_poserr.clear(); time_occulay.clear();
 
 
     if (stopFlag) {

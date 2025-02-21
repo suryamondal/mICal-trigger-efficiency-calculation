@@ -64,7 +64,7 @@ double INOCalibrationManager::getStripTimeDelay(const StripId& stripId) const {
                     "Module=? AND Row=? AND Column=? "
                     "AND Layer=? AND Side=? AND Strip=?;";
   sqlite3_stmt* stmt;
-  double value = 0.0;
+  double value = -265;
   if (sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, nullptr) == SQLITE_OK) {
     sqlite3_bind_int(stmt, 1, stripId.module);
     sqlite3_bind_int(stmt, 2, stripId.row);
