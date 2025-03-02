@@ -12,17 +12,6 @@
 
 namespace INO {
 
-  struct Hit {
-    StripId stripId;
-    std::vector<double> rawTimes[2]; // leading and trailing
-    std::vector<double> calibratedTimes[2];
-    double trackedCalibratedTime[2];
-    double rawPosition;
-    double alignedPosition;
-    std::vector<int> m_timeGroupId;    /**< Grouping of clusters in time */
-    std::vector<std::tuple<float, float, float>> m_timeGroupInfo; /**< TimeGroup Gaussian Parameters, (integral, center, sigma) */
-  };
-
   class INOEvent {
   public:
     INOEvent();
@@ -35,6 +24,7 @@ namespace INO {
     std::vector<const Hit*> getHits() const;
     // Method to get raw leading time of a hit
     double getRawLeadingTime(const StripId& stripId) const;
+    std::vector<double> getRawLeadingTimes(const StripId& stripId) const;
     // Method to get all leading TDC values
     std::vector<double> getCalibratedLeadingTimes(const StripId& stripId) const;
 
@@ -84,8 +74,6 @@ namespace INO {
     double eventTime;
     double lowestCalibratedLeadingTime;
     double highestCalibratedLeadingTime;
-
-    static std::shared_ptr<INOCalibrationManager> m_inoCalibrationManager;
   };
 
 } // namespace INO

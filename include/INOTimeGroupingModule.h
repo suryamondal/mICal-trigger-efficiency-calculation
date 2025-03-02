@@ -23,7 +23,7 @@ namespace INO {
     /** Expected range of svd time histogram [ns]. */
     Float_t tRange[2];
     /** Time bin width is 1/rebinningFactor [ns]. */
-    Int_t   rebinningFactor;
+    Float_t   rebinningFactor;
     /** Number of Gaussian sigmas used to fill the time histogram for each cluster. */
     Float_t fillSigmaN;
     /** Limit of cluster time sigma for the fit for the peak-search [ns]. */

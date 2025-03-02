@@ -1,5 +1,7 @@
 **~
 build
+GetEntries.C
+output
 
 #Prerequisites
 *.d

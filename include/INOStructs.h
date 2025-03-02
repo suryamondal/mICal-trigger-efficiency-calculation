@@ -2,6 +2,8 @@
 
 #include <memory>
 #include <map>
+#include <string>
+#include <vector>
 
 namespace INO {
   
@@ -14,6 +16,11 @@ namespace INO {
     bool operator<(const LayerId& other) const {
       return std::tie(module, row, column, layer) < 
         std::tie(other.module, other.row, other.column, other.layer);
+    }
+    // Define operator== for equality comparison
+    bool operator==(const LayerId& other) const {
+      return std::tie(module, row, column, layer) == 
+	std::tie(other.module, other.row, other.column, other.layer);
     }
   };
 
@@ -58,29 +65,28 @@ namespace INO {
     }
   };
 
-  class INOCalibrationManager {
-  public:
-    INOCalibrationManager() {}
-    // Get the singleton instance
-    static std::shared_ptr<INOCalibrationManager> getInstance();
-
-    // Setter for time calibration
-    void setTimeCalibration(const StripId& stripId, double time) {
-      timeCalibration[stripId] = time;
+  struct PixelId {
+    int module;
+    int row;
+    int column;
+    int layer;
+    int strip[2];
+    // Define operator< for map key comparison
+    bool operator<(const PixelId& other) const {
+      return std::tie(module, row, column, layer, strip[0], strip[1]) < 
+        std::tie(other.module, other.row, other.column, other.layer, other.strip[0], other.strip[1]);
     }
-
-    // Getter for time calibration
-    double getTimeCalibration(const StripId& stripId) const {
-      auto it = timeCalibration.find(stripId);
-      if (it != timeCalibration.end())
-        return it->second;
-      return 0;
-    }
-
-  private:
-    static std::shared_ptr<INOCalibrationManager> instance;
-
-    std::map<StripId, double> timeCalibration;
+  };
+  
+  struct Hit {
+    StripId stripId;
+    std::vector<double> rawTimes[2]; // leading and trailing
+    std::vector<double> calibratedTimes[2];
+    double trackedCalibratedTime[2];
+    double rawPosition;
+    double alignedPosition;
+    std::vector<int> m_timeGroupId;    /**< Grouping of clusters in time */
+    std::vector<std::tuple<float, float, float>> m_timeGroupInfo; /**< TimeGroup Gaussian Parameters, (integral, center, sigma) */
   };
 
 } // namespace INO
