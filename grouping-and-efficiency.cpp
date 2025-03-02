@@ -1,6 +1,7 @@
 
 
 // #define isDebug
+#define storePixels
 
 #include <iostream>
 #include <fstream>
@@ -11,6 +12,7 @@
 #include <memory>
 #include <csignal>
 #include <algorithm>
+#include <fstream>
 
 #include "TTimeStamp.h"
 #include "TH1.h"
@@ -274,6 +276,10 @@ int main(int argc, char** argv) {
   
   Long64_t start_s = clock();
 
+#ifdef storePixels
+  std::vector<std::vector<INO::PixelId>> allPixelsInEvents;
+#endif
+
   Long64_t nentry = event_tree->GetEntries();
   for(Long64_t iev=nentrymn; iev<=TMath::Min(nentry - 1, nentrymx); iev++) {
       
@@ -396,6 +402,9 @@ int main(int argc, char** argv) {
                                  {sideId.side ? strip2.strip : strip1.strip,
                                   sideId.side ? strip1.strip : strip2.strip} });
     }
+#ifdef storePixels
+    allPixelsInEvents.push_back(allPixels);
+#endif
     // std::cout << " total pixels " << allPixels.size() << endl;
 
     std::vector<TVector3>  pos;
@@ -441,6 +450,7 @@ int main(int argc, char** argv) {
 
 
     std::map<INO::SideId, double> layerTimes;
+    std::map<INO::StripId, double> stripResiduals;
     for (auto extHit : ext) {
       int layer = getILayer(extHit.Z());
       for (auto pixel : allPixels) {
@@ -461,54 +471,9 @@ int main(int argc, char** argv) {
         rawPos.RotateY(rpcOrientation.Y() * TMath::DegToRad());
         rawPos.RotateZ(rpcOrientation.Z() * TMath::DegToRad());
         for (int nj : {0, 1}) {
-          INO::SideId sideId = {pixel.module, pixel.row, pixel.column, layer, nj};
-          std::string sideName = INO::getSideName(sideId);
           INO::StripId stripId = {pixel.module, pixel.row, pixel.column, layer, nj, pixel.strip[nj]};
-          std::string stripName = INO::getStripName(stripId);
-
-          // position
-          std::string suffix = "_residual";
-          {
-            auto it = positionResidual.find((sideName + suffix));
-            if (it == positionResidual.end()) {
-              positionResidual[(sideName + suffix)] = new TH1D((sideName + suffix).c_str(),
-                                                               (sideName + suffix).c_str(),
-                                                               500, -0.25, 0.25);
-              positionResidual[(sideName + suffix)]->SetDirectory(0);
-            }
-          }
-          positionResidual[(sideName + suffix)]->Fill(extHit[nj] - rawPos[nj]);
-          {
-            auto it = positionResidual.find((stripName + suffix));
-            if (it == positionResidual.end()) {
-              positionResidual[(stripName + suffix)] = new TH1D((stripName + suffix).c_str(),
-                                                                (stripName + suffix).c_str(),
-                                                                500, -0.25, 0.25);
-              positionResidual[(stripName + suffix)]->SetDirectory(0);
-            }
-          }
-          positionResidual[(stripName + suffix)]->Fill(extHit[nj] - rawPos[nj]);
-          // suffix = "_pull";
-          // {
-          //   auto it = positionResidual.find((sideName + suffix));
-          //   if (it == positionResidual.end()) {
-          //     positionResidual[(sideName + suffix)] = new TH1D((sideName + suffix).c_str(),
-          //                                                      (sideName + suffix).c_str(),
-          //                                                      100, -5, 5);
-          //     positionResidual[(sideName + suffix)]->SetDirectory(0);
-          //   }
-          // }
-          // positionResidual[(sideName + suffix)]->Fill((extHit[nj] - rawPos[nj]) / positionUncertainty);
-          // {
-          //   auto it = positionResidual.find((stripName + suffix));
-          //   if (it == positionResidual.end()) {
-          //     positionResidual[(stripName + suffix)] = new TH1D((stripName + suffix).c_str(),
-          //                                                       (stripName + suffix).c_str(),
-          //                                                       100, -5, 5);
-          //     positionResidual[(stripName + suffix)]->SetDirectory(0);
-          //   }
-          // }
-          // positionResidual[(stripName + suffix)]->Fill((extHit[nj] - rawPos[nj]) / positionUncertainty);
+          INO::SideId sideId = {pixel.module, pixel.row, pixel.column, pixel.layer, nj};
+          stripResiduals[stripId] = extHit[nj] - rawPos[nj];
 
           // time
           {
@@ -559,6 +524,56 @@ int main(int argc, char** argv) {
       }
     }
 
+    for (auto item : stripResiduals) {
+      auto stripId = item.first;
+      auto residual = item.second;
+      INO::SideId sideId = {stripId.module, stripId.row, stripId.column, stripId.layer, stripId.side};
+      std::string sideName = INO::getSideName(sideId);
+      std::string stripName = INO::getStripName(stripId);
+      // position
+      std::string suffix = "_residual";
+      {
+        auto it = positionResidual.find((sideName + suffix));
+        if (it == positionResidual.end()) {
+          positionResidual[(sideName + suffix)] = new TH1D((sideName + suffix).c_str(),
+                                                           (sideName + suffix).c_str(),
+                                                           300, -stripWidth * 5, stripWidth * 5);
+          positionResidual[(sideName + suffix)]->SetDirectory(0);
+        }
+      }
+      positionResidual[(sideName + suffix)]->Fill(residual);
+      {
+        auto it = positionResidual.find((stripName + suffix));
+        if (it == positionResidual.end()) {
+          positionResidual[(stripName + suffix)] = new TH1D((stripName + suffix).c_str(),
+                                                            (stripName + suffix).c_str(),
+                                                            300, -stripWidth * 5, stripWidth * 5);
+          positionResidual[(stripName + suffix)]->SetDirectory(0);
+        }
+      }
+      positionResidual[(stripName + suffix)]->Fill(residual);
+      // suffix = "_pull";
+      // {
+      //   auto it = positionResidual.find((sideName + suffix));
+      //   if (it == positionResidual.end()) {
+      //     positionResidual[(sideName + suffix)] = new TH1D((sideName + suffix).c_str(),
+      //                                                      (sideName + suffix).c_str(),
+      //                                                      100, -5, 5);
+      //     positionResidual[(sideName + suffix)]->SetDirectory(0);
+      //   }
+      // }
+      // positionResidual[(sideName + suffix)]->Fill((extHit[nj] - rawPos[nj]) / positionUncertainty);
+      // {
+      //   auto it = positionResidual.find((stripName + suffix));
+      //   if (it == positionResidual.end()) {
+      //     positionResidual[(stripName + suffix)] = new TH1D((stripName + suffix).c_str(),
+      //                                                       (stripName + suffix).c_str(),
+      //                                                       100, -5, 5);
+      //     positionResidual[(stripName + suffix)]->SetDirectory(0);
+      //   }
+      // }
+      // positionResidual[(stripName + suffix)]->Fill((extHit[nj] - rawPos[nj]) / positionUncertainty);
+    }
 
     // time fit
     std::vector<TVector3>  time_pos;
@@ -579,6 +594,10 @@ int main(int argc, char** argv) {
 
   } // for(Long64_t iev=nentrymn;iev<nentry;iev++) {
   fileIn->Close();
+
+#ifdef storePixels
+  INO::writePixelsToFile(std::string(outfile) + "_pixels.bin", allPixelsInEvents);
+#endif
 
   TDirectory* dir = fileOut->mkdir("EventMeta");
   dir->cd();
