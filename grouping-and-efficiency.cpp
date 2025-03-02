@@ -54,7 +54,7 @@ const int        nlayer        =  10;
 const int        nstrip        =  64;
 const int        nTDC          =   8;
 const double     tdc_least     =   0.1;	 // in ns
-const double     stripwidth     =   0.03; // in m
+const double     stripWidth     =   0.03; // in m
 
 const double     maxtime       =  22.e3;      // in ns
 const double     spdl_mpns      =   0.2;	      // m/ns
@@ -76,7 +76,7 @@ const double   rpcZShift         = 0; //
 // const double   rpcYOffset        = 0.;	  // 
 // const double   moduleDistance    = 0.;	  //
 
-
+const double positionUncertainty = stripWidth / TMath::Sqrt(12);
 
 
 double getLayerZ(const int& layer) {
@@ -114,11 +114,8 @@ void LinearVectorFit(bool              isTime, // time iter
   for(int ij=0;ij<int(pos.size());ij++) {
     if(int(occulay.size()) && !occulay[ij]) {continue;}
     // cout << " ij " << ij << endl;
-    double xyzval[3] = {pos[ij].X(),
-                        pos[ij].Y(),
-                        pos[ij].Z()};
-    double xyerr[2]  = {poserr[ij].X(),
-                        poserr[ij].Y()};
+    double xyzval[3] = {pos[ij].X(), pos[ij].Y(), pos[ij].Z()};
+    double xyerr[2]  = {poserr[ij].X(), poserr[ij].Y()};
     for(int nj=0;nj<nside;nj++) {
       szxy[nj] += xyzval[2]*xyzval[nj]/xyerr[nj];
       sz[nj]   += xyzval[2]/xyerr[nj];
@@ -263,7 +260,7 @@ int main(int argc, char** argv) {
 
   std::map<std::string, TH1D*> eventMetaHistograms;
   std::map<INO::StripId, TH1D*> stripTimeDelay;
-  std::map<INO::SideId, TH1D*> positionResidual;
+  std::map<std::string, TH1D*> positionResidual;
   std::map<INO::SideId, TH2D*> layerEfficiency;
   std::map<INO::SideId, TH1D*> specialHistograms;
 
@@ -391,18 +388,11 @@ int main(int argc, char** argv) {
     for (auto stripHit : stripHits) {
       if (int(stripHit.second.size()) > 5) continue;
       auto sideId = stripHit.first;
-      auto it = stripHits.find({sideId.module,
-                                sideId.row,
-                                sideId.column,
-                                sideId.layer,
-                                !sideId.side});
+      auto it = stripHits.find({sideId.module, sideId.row, sideId.column, sideId.layer, !sideId.side});
       if (it != stripHits.end())
         for (auto strip1 : stripHit.second)
           for (auto strip2 : it->second)
-            allPixels.push_back({sideId.module,
-                                 sideId.row,
-                                 sideId.column,
-                                 sideId.layer,
+            allPixels.push_back({sideId.module, sideId.row, sideId.column, sideId.layer,
                                  {sideId.side ? strip2.strip : strip1.strip,
                                   sideId.side ? strip1.strip : strip2.strip} });
     }
@@ -418,13 +408,13 @@ int main(int argc, char** argv) {
     std::vector<TVector3> exterr;
     pos.clear(); poserr.clear(); occulay.clear();
     for (auto pixel : allPixels) {
-      TVector3 rawPos = {(pixel.strip[0] + 0.5) * stripwidth,
-                         (pixel.strip[1] + 0.5) * stripwidth,
-                         getLayerZ(pixel.layer)};
+      TVector3 rawPos = {
+        (pixel.strip[0] + 0.5) * stripWidth,
+        (pixel.strip[1] + 0.5) * stripWidth,
+        getLayerZ(pixel.layer)};
       TVector3 rpcPosition, rpcOrientation;
       inoCalibrationManager
-        .getLayerPosition({pixel.module, pixel.row, pixel.column,
-                           pixel.layer},
+        .getLayerPosition({pixel.module, pixel.row, pixel.column, pixel.layer},
           pixel.strip[0] < 32 ? 0 : 1,
           pixel.strip[1] < 32 ? 0 : 1,
           rpcPosition, rpcOrientation);
@@ -434,16 +424,16 @@ int main(int argc, char** argv) {
       rawPos.RotateY(rpcOrientation.Y() * TMath::DegToRad());
       rawPos.RotateZ(rpcOrientation.Z() * TMath::DegToRad());
       pos.push_back(rawPos);
-      poserr.push_back({0.008, 0.008});
+      poserr.push_back({positionUncertainty, positionUncertainty});
     }
     LinearVectorFit(0, pos, poserr, occulay, slope, inter, chi2, ext, exterr);
 
 #ifdef isDebug
     for (int ij=0;ij<int(pos.size());ij++)
-      std::cout << " X " << pos[ij].X() / stripwidth
-                << " Y " << pos[ij].Y() / stripwidth
-                << " extX " << ext[ij].X() / stripwidth
-                << " extY " << ext[ij].Y() / stripwidth
+      std::cout << " X " << pos[ij].X() / stripWidth
+                << " Y " << pos[ij].Y() / stripWidth
+                << " extX " << ext[ij].X() / stripWidth
+                << " extY " << ext[ij].Y() / stripWidth
                 << " layer " << ext[ij].Z()
                 << " layerI " << getILayer(ext[ij].Z())
                 << std::endl;
@@ -455,13 +445,13 @@ int main(int argc, char** argv) {
       int layer = getILayer(extHit.Z());
       for (auto pixel : allPixels) {
         if (layer != pixel.layer) continue;
-        TVector3 rawPos = {(pixel.strip[0] + 0.5) * stripwidth,
-                           (pixel.strip[1] + 0.5) * stripwidth,
-                           getLayerZ(pixel.layer)};
+        TVector3 rawPos = {
+          (pixel.strip[0] + 0.5) * stripWidth,
+          (pixel.strip[1] + 0.5) * stripWidth,
+          getLayerZ(pixel.layer)};
         TVector3 rpcPosition, rpcOrientation;
         inoCalibrationManager
-          .getLayerPosition({pixel.module, pixel.row, pixel.column,
-                             pixel.layer},
+          .getLayerPosition({pixel.module, pixel.row, pixel.column, pixel.layer},
             pixel.strip[0] < 32 ? 0 : 1,
             pixel.strip[1] < 32 ? 0 : 1,
             rpcPosition, rpcOrientation);
@@ -471,28 +461,65 @@ int main(int argc, char** argv) {
         rawPos.RotateY(rpcOrientation.Y() * TMath::DegToRad());
         rawPos.RotateZ(rpcOrientation.Z() * TMath::DegToRad());
         for (int nj : {0, 1}) {
+          INO::SideId sideId = {pixel.module, pixel.row, pixel.column, layer, nj};
+          std::string sideName = INO::getSideName(sideId);
+          INO::StripId stripId = {pixel.module, pixel.row, pixel.column, layer, nj, pixel.strip[nj]};
+          std::string stripName = INO::getStripName(stripId);
+
           // position
-          INO::SideId sideId = {pixel.module, pixel.row, pixel.column,
-                                layer, nj};
-          auto it = positionResidual.find(sideId);
-          if (it == positionResidual.end()) {
-            std::string sideName = INO::getSideName(sideId);
-            positionResidual[sideId] = new TH1D(sideName.c_str(),
-                                                sideName.c_str(),
-                                                500, -0.25, 0.25);
-            positionResidual[sideId]->SetDirectory(0);
+          std::string suffix = "_residual";
+          {
+            auto it = positionResidual.find((sideName + suffix));
+            if (it == positionResidual.end()) {
+              positionResidual[(sideName + suffix)] = new TH1D((sideName + suffix).c_str(),
+                                                               (sideName + suffix).c_str(),
+                                                               500, -0.25, 0.25);
+              positionResidual[(sideName + suffix)]->SetDirectory(0);
+            }
           }
-          positionResidual[sideId]->Fill(extHit[nj] - rawPos[nj]);
+          positionResidual[(sideName + suffix)]->Fill(extHit[nj] - rawPos[nj]);
+          {
+            auto it = positionResidual.find((stripName + suffix));
+            if (it == positionResidual.end()) {
+              positionResidual[(stripName + suffix)] = new TH1D((stripName + suffix).c_str(),
+                                                                (stripName + suffix).c_str(),
+                                                                500, -0.25, 0.25);
+              positionResidual[(stripName + suffix)]->SetDirectory(0);
+            }
+          }
+          positionResidual[(stripName + suffix)]->Fill(extHit[nj] - rawPos[nj]);
+          // suffix = "_pull";
+          // {
+          //   auto it = positionResidual.find((sideName + suffix));
+          //   if (it == positionResidual.end()) {
+          //     positionResidual[(sideName + suffix)] = new TH1D((sideName + suffix).c_str(),
+          //                                                      (sideName + suffix).c_str(),
+          //                                                      100, -5, 5);
+          //     positionResidual[(sideName + suffix)]->SetDirectory(0);
+          //   }
+          // }
+          // positionResidual[(sideName + suffix)]->Fill((extHit[nj] - rawPos[nj]) / positionUncertainty);
+          // {
+          //   auto it = positionResidual.find((stripName + suffix));
+          //   if (it == positionResidual.end()) {
+          //     positionResidual[(stripName + suffix)] = new TH1D((stripName + suffix).c_str(),
+          //                                                       (stripName + suffix).c_str(),
+          //                                                       100, -5, 5);
+          //     positionResidual[(stripName + suffix)]->SetDirectory(0);
+          //   }
+          // }
+          // positionResidual[(stripName + suffix)]->Fill((extHit[nj] - rawPos[nj]) / positionUncertainty);
+
           // time
-          INO::StripId stripId = {pixel.module, pixel.row, pixel.column,
-                                  layer, nj, pixel.strip[nj]};
-          auto itt = stripTimeDelay.find(stripId);
-          if (itt == stripTimeDelay.end()) {
-            std::string stripName = INO::getStripName(stripId);
-            stripTimeDelay[stripId] = new TH1D(stripName.c_str(),
-                                               stripName.c_str(),
-                                               200, -312.5, -212.5);
-            stripTimeDelay[stripId]->SetDirectory(0);
+          {
+            auto it = stripTimeDelay.find(stripId);
+            if (it == stripTimeDelay.end()) {
+              std::string stripName = INO::getStripName(stripId);
+              stripTimeDelay[stripId] = new TH1D(stripName.c_str(),
+                                                 stripName.c_str(),
+                                                 200, -312.5, -212.5);
+              stripTimeDelay[stripId]->SetDirectory(0);
+            }
           }
           if(int(inoEvent->getRawLeadingTimes(stripId).size())) {
             double time = inoEvent->getRawLeadingTimes(stripId)[0];
@@ -517,12 +544,11 @@ int main(int argc, char** argv) {
     for (auto item : layerTimes) {
       auto sideId = item.first;
       int time = item.second;
-      INO::SideId checkSide = {sideId.module, sideId.row, sideId.column,
-                               sideId.layer + 1, sideId.side};
+      INO::SideId checkSide = {sideId.module, sideId.row, sideId.column, sideId.layer + 1, sideId.side};
       auto layerTime = layerTimes.find(checkSide);
       if (layerTime != layerTimes.end()) {
-        auto itt = specialHistograms.find(sideId);
-        if (itt == specialHistograms.end()) {
+        auto it = specialHistograms.find(sideId);
+        if (it == specialHistograms.end()) {
           std::string sideName = "layerTimeDifference_" + INO::getSideName(sideId);
           specialHistograms[sideId] = new TH1D(sideName.c_str(),
                                                sideName.c_str(),
