@@ -65,12 +65,12 @@ namespace INO {
     file.close();
   }
 
-  void readPixelsFromAllFiles(const std::string& directory, std::vector<std::vector<std::vector<INO::PixelId>>>& allData) {
+  void readPixelsFromAllFiles(const std::string& directory, std::vector<std::vector<INO::PixelId>>& allData) {
     for (const auto& entry : std::filesystem::directory_iterator(directory)) {
       if (entry.is_regular_file()) {
         std::vector<std::vector<INO::PixelId>> allPixels;
         readPixelsFromFile(entry.path().string(), allPixels);
-        allData.push_back(allPixels);
+        allData.insert(allData.end(), allPixels.begin(), allPixels.end());
       }
     }
   }

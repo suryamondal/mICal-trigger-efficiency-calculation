@@ -77,6 +77,21 @@ namespace INO {
         std::tie(other.module, other.row, other.column, other.layer, other.strip[0], other.strip[1]);
     }
   };
+
+  struct StripletId {
+    int module;
+    int row;
+    int column;
+    int layer;
+    int side;
+    int strip;
+    int zone;
+    // Define operator< for map key comparison
+    bool operator<(const StripletId& other) const {
+      return std::tie(module, row, column, layer, side, strip, zone) <
+        std::tie(other.module, other.row, other.column, other.layer, other.side, other.strip, other.zone);
+    }
+  };
   
   struct Hit {
     StripId stripId;
