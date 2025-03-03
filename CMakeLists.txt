@@ -13,10 +13,10 @@ find_package(SQLite3 REQUIRED)
 # Automatically find .cc files in src/
 file(GLOB SOURCES src/*.cc)
 
-# # Add executable
-# add_executable(grouping-and-efficiency grouping-and-efficiency.cpp ${SOURCES})
-# # Link against ROOT and MySQL libraries
-# target_link_libraries(grouping-and-efficiency ROOT::Core ROOT::RIO ROOT::Tree ROOT::Hist ROOT::Physics SQLite::SQLite3)
+# Add executable
+add_executable(grouping-and-efficiency grouping-and-efficiency.cpp ${SOURCES})
+# Link against ROOT and MySQL libraries
+target_link_libraries(grouping-and-efficiency ROOT::Core ROOT::RIO ROOT::Tree ROOT::Hist ROOT::Physics SQLite::SQLite3)
 
 # # Add executable
 # add_executable(time-alignment time-alignment.cpp ${SOURCES})

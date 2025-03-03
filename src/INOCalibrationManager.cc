@@ -29,6 +29,18 @@ void INOCalibrationManager::initializeDatabase() {
     }
   }
   {
+    const char* sql = "CREATE TABLE IF NOT EXISTS RPCPosition ("
+      "Module INTEGER, Row INTEGER, Column INTEGER, Layer INTEGER, "
+      "detector_zone_x INTEGER, detector_zone_y INTEGER, "
+      "position_x REAL, position_y REAL, position_z REAL, orientation_x REAL, orientation_y REAL, orientation_z REAL, "
+      "PRIMARY KEY (Module, Row, Column, Layer, detector_zone_x, detector_zone_y));";
+    char* errMsg = nullptr;
+    if (sqlite3_exec(db, sql, nullptr, nullptr, &errMsg) != SQLITE_OK) {
+      std::cerr << "Error creating table: " << errMsg << std::endl;
+      sqlite3_free(errMsg);
+    }
+  }
+  {
     const char* sql = "CREATE TABLE IF NOT EXISTS StripletPosition ("
       "Module INTEGER, Row INTEGER, Column INTEGER, "
       "Layer INTEGER, Side INTEGER, Strip INTEGER, Zone INTEGER, "
@@ -70,7 +82,6 @@ void INOCalibrationManager::setStripTimeDelay(const StripId& stripId, double val
 
 double INOCalibrationManager::getStripTimeDelay(const StripId& stripId) const {
   sqlite3_busy_timeout(db, 5000);
-
   std::string sql = "SELECT Value FROM StripTimeDelay WHERE "
     "Module=? AND Row=? AND Column=? "
     "AND Layer=? AND Side=? AND Strip=?;";
@@ -116,14 +127,44 @@ double INOCalibrationManager::getStripTimeDelay(const StripId& stripId) const {
 //   }
 // }
 
+
+void INOCalibrationManager::setLayerPosition(const LayerId& layerId, const int& x, const int& y,
+                                             const TVector3& position, const TVector3& orientation) {
+  sqlite3_busy_timeout(db, 5000);
+  std::string sql = "INSERT INTO RPCPosition (Module, Row, Column, Layer, "
+    "detector_zone_x, detector_zone_y, "
+    "position_x, position_y, position_z, orientation_x, orientation_y, orientation_z) "
+    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
+  sqlite3_stmt* stmt;
+  if (sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, nullptr) == SQLITE_OK) {
+    sqlite3_bind_int(stmt, 1, layerId.module);
+    sqlite3_bind_int(stmt, 2, layerId.row);
+    sqlite3_bind_int(stmt, 3, layerId.column);
+    sqlite3_bind_int(stmt, 4, layerId.layer);
+    sqlite3_bind_int(stmt, 5, x);
+    sqlite3_bind_int(stmt, 6, y);
+    sqlite3_bind_double(stmt, 7, position.X());
+    sqlite3_bind_double(stmt, 8, position.Y());
+    sqlite3_bind_double(stmt, 9, position.Z());
+    sqlite3_bind_double(stmt, 10, orientation.X());
+    sqlite3_bind_double(stmt, 11, orientation.Y());
+    sqlite3_bind_double(stmt, 12, orientation.Z());
+    if (sqlite3_step(stmt) != SQLITE_DONE)
+      std::cerr << "Error inserting/updating calibration data: " << sqlite3_errmsg(db) << std::endl;
+    sqlite3_finalize(stmt);
+  } else {
+    std::cerr << "SQL error in setStripTimeDelay: " << sqlite3_errmsg(db) << std::endl;
+  }
+}
+
+
 void INOCalibrationManager::getLayerPosition(const LayerId& layerId, const int& x, const int& y,
                                              TVector3& position, TVector3& orientation) const {
   const char* sql = "SELECT position_x, position_y, position_z, orientation_x, orientation_y, orientation_z "
-    "FROM Position WHERE Module =? AND Row =? AND Column =? AND Layer = ? AND detector_type_x = ? AND detector_type_y = ?;";
+    "FROM RPCPosition WHERE Module =? AND Row =? AND Column =? AND Layer = ? AND detector_zone_x = ? AND detector_zone_y = ?;";
   sqlite3_stmt* stmt;
   // Prepare the statement
   if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) == SQLITE_OK) {
-
     // Bind parameters to the SQL query
     sqlite3_bind_int(stmt, 1, layerId.module);
     sqlite3_bind_int(stmt, 2, layerId.row);
@@ -131,7 +172,6 @@ void INOCalibrationManager::getLayerPosition(const LayerId& layerId, const int& 
     sqlite3_bind_int(stmt, 4, layerId.layer);
     sqlite3_bind_int(stmt, 5, x);
     sqlite3_bind_int(stmt, 6, y);
-
     // Execute the query and retrieve the result
     if (sqlite3_step(stmt) == SQLITE_ROW) {
       position.SetX(sqlite3_column_double(stmt, 0));

@@ -1,7 +1,7 @@
 
 
 // #define isDebug
-#define storePixels
+// #define storePixels
 
 #include <iostream>
 #include <fstream>
@@ -392,7 +392,7 @@ int main(int argc, char** argv) {
     if (int(stripHits.size()) < 10) continue;
     std::vector<INO::PixelId> allPixels;
     for (auto stripHit : stripHits) {
-      if (int(stripHit.second.size()) > 5) continue;
+      if (int(stripHit.second.size()) > 1) continue;
       auto sideId = stripHit.first;
       auto it = stripHits.find({sideId.module, sideId.row, sideId.column, sideId.layer, !sideId.side});
       if (it != stripHits.end())
@@ -466,10 +466,11 @@ int main(int argc, char** argv) {
             pixel.strip[1] < 32 ? 0 : 1,
             rpcPosition, rpcOrientation);
         rpcPosition.SetZ(0);
-        rawPos += rpcPosition;
-        rawPos.RotateX(rpcOrientation.X() * TMath::DegToRad());
-        rawPos.RotateY(rpcOrientation.Y() * TMath::DegToRad());
-        rawPos.RotateZ(rpcOrientation.Z() * TMath::DegToRad());
+        TVector3 newExtPos = extHit;
+        newExtPos -= rpcPosition;
+        newExtPos.RotateX(-rpcOrientation.X() * TMath::DegToRad());
+        newExtPos.RotateY(-rpcOrientation.Y() * TMath::DegToRad());
+        newExtPos.RotateZ(-rpcOrientation.Z() * TMath::DegToRad());
         for (int nj : {0, 1}) {
           INO::StripId stripId = {pixel.module, pixel.row, pixel.column, layer, nj, pixel.strip[nj]};
           INO::SideId sideId = {pixel.module, pixel.row, pixel.column, pixel.layer, nj};
@@ -537,7 +538,7 @@ int main(int argc, char** argv) {
         if (it == positionResidual.end()) {
           positionResidual[(sideName + suffix)] = new TH1D((sideName + suffix).c_str(),
                                                            (sideName + suffix).c_str(),
-                                                           300, -stripWidth * 5, stripWidth * 5);
+                                                           90, -stripWidth, stripWidth);
           positionResidual[(sideName + suffix)]->SetDirectory(0);
         }
       }
@@ -547,7 +548,7 @@ int main(int argc, char** argv) {
         if (it == positionResidual.end()) {
           positionResidual[(stripName + suffix)] = new TH1D((stripName + suffix).c_str(),
                                                             (stripName + suffix).c_str(),
-                                                            300, -stripWidth * 5, stripWidth * 5);
+                                                            90, -stripWidth, stripWidth);
           positionResidual[(stripName + suffix)]->SetDirectory(0);
         }
       }
