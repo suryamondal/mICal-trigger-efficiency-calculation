@@ -28,6 +28,18 @@ void INOCalibrationManager::initializeDatabase() {
       sqlite3_free(errMsg);
     }
   }
+  {
+    const char* sql = "CREATE TABLE IF NOT EXISTS StripletPosition ("
+      "Module INTEGER, Row INTEGER, Column INTEGER, "
+      "Layer INTEGER, Side INTEGER, Strip INTEGER, Zone INTEGER, "
+      "position_x REAL, position_y REAL, position_z REAL, orientation_x REAL, orientation_y REAL, orientation_z REAL, "
+      "PRIMARY KEY (Module, Row, Column, Layer, Side, Strip, Zone));";
+    char* errMsg = nullptr;
+    if (sqlite3_exec(db, sql, nullptr, nullptr, &errMsg) != SQLITE_OK) {
+      std::cerr << "Error creating table: " << errMsg << std::endl;
+      sqlite3_free(errMsg);
+    }
+  }
 }
 
 INOCalibrationManager& INOCalibrationManager::getInstance() {
@@ -37,7 +49,6 @@ INOCalibrationManager& INOCalibrationManager::getInstance() {
 
 void INOCalibrationManager::setStripTimeDelay(const StripId& stripId, double value) {
   sqlite3_busy_timeout(db, 5000);
-
   std::string sql = "INSERT OR REPLACE INTO StripTimeDelay (Module, Row, Column, Layer, Side, Strip, Value) "
     "VALUES (?, ?, ?, ?, ?, ?, ?);";
   sqlite3_stmt* stmt;
@@ -61,8 +72,8 @@ double INOCalibrationManager::getStripTimeDelay(const StripId& stripId) const {
   sqlite3_busy_timeout(db, 5000);
 
   std::string sql = "SELECT Value FROM StripTimeDelay WHERE "
-                    "Module=? AND Row=? AND Column=? "
-                    "AND Layer=? AND Side=? AND Strip=?;";
+    "Module=? AND Row=? AND Column=? "
+    "AND Layer=? AND Side=? AND Strip=?;";
   sqlite3_stmt* stmt;
   double value = -265;
   if (sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, nullptr) == SQLITE_OK) {
@@ -106,7 +117,7 @@ double INOCalibrationManager::getStripTimeDelay(const StripId& stripId) const {
 // }
 
 void INOCalibrationManager::getLayerPosition(const LayerId& layerId, const int& x, const int& y,
-					     TVector3& position, TVector3& orientation) const {
+                                             TVector3& position, TVector3& orientation) const {
   const char* sql = "SELECT position_x, position_y, position_z, orientation_x, orientation_y, orientation_z "
     "FROM Position WHERE Module =? AND Row =? AND Column =? AND Layer = ? AND detector_type_x = ? AND detector_type_y = ?;";
   sqlite3_stmt* stmt;
@@ -134,6 +145,63 @@ void INOCalibrationManager::getLayerPosition(const LayerId& layerId, const int& 
     }
     sqlite3_finalize(stmt);
   }
+}
 
-  // Cleanup
+
+void INOCalibrationManager::setStripletPosition(const StripletId& stripletId,
+                                                const TVector3& position, const TVector3& orientation) {
+  sqlite3_busy_timeout(db, 5000);
+  std::string sql = "INSERT INTO StripletPosition (Module, Row, Column, Layer, Zone, "
+    "position_x, position_y, position_z, orientation_x, orientation_y, orientation_z) "
+    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
+  sqlite3_stmt* stmt;
+  if (sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, nullptr) == SQLITE_OK) {
+    sqlite3_bind_int(stmt, 1, stripletId.module);
+    sqlite3_bind_int(stmt, 2, stripletId.row);
+    sqlite3_bind_int(stmt, 3, stripletId.column);
+    sqlite3_bind_int(stmt, 4, stripletId.layer);
+    sqlite3_bind_int(stmt, 5, stripletId.side);
+    sqlite3_bind_int(stmt, 6, stripletId.strip);
+    sqlite3_bind_double(stmt, 7, position.X());
+    sqlite3_bind_double(stmt, 8, position.Y());
+    sqlite3_bind_double(stmt, 9, position.Z());
+    sqlite3_bind_double(stmt, 10, orientation.X());
+    sqlite3_bind_double(stmt, 11, orientation.Y());
+    sqlite3_bind_double(stmt, 12, orientation.Z());
+    if (sqlite3_step(stmt) != SQLITE_DONE)
+      std::cerr << "Error inserting/updating calibration data: " << sqlite3_errmsg(db) << std::endl;
+    sqlite3_finalize(stmt);
+  } else {
+    std::cerr << "SQL error in setStripTimeDelay: " << sqlite3_errmsg(db) << std::endl;
+  }
+}
+
+
+void INOCalibrationManager::getStripletPosition(const StripletId& stripletId,
+                                                TVector3& position, TVector3& orientation) const {
+  const char* sql = "SELECT position_x, position_y, position_z, orientation_x, orientation_y, orientation_z "
+    "FROM StripletPosition WHERE Module =? AND Row =? AND Column =? AND Layer = ? AND Strip = ? AND Zone = ?;";
+  sqlite3_stmt* stmt;
+  // Prepare the statement
+  if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) == SQLITE_OK) {
+    // Bind parameters to the SQL query
+    sqlite3_bind_int(stmt, 1, stripletId.module);
+    sqlite3_bind_int(stmt, 2, stripletId.row);
+    sqlite3_bind_int(stmt, 3, stripletId.column);
+    sqlite3_bind_int(stmt, 4, stripletId.layer);
+    sqlite3_bind_int(stmt, 5, stripletId.strip);
+    sqlite3_bind_int(stmt, 6, stripletId.zone);
+    // Execute the query and retrieve the result
+    if (sqlite3_step(stmt) == SQLITE_ROW) {
+      position.SetX(sqlite3_column_double(stmt, 0));
+      position.SetY(sqlite3_column_double(stmt, 1));
+      position.SetZ(sqlite3_column_double(stmt, 2));
+      orientation.SetX(sqlite3_column_double(stmt, 3));
+      orientation.SetY(sqlite3_column_double(stmt, 4));
+      orientation.SetZ(sqlite3_column_double(stmt, 5));
+      // std::cout << "Position: (" << position.X() << ", " << position.Y() << ", " << position.Z() << ")\n";
+      // std::cout << "Orientation: (" << orientation.X() << ", " << orientation.Y() << ", " << orientation.Z() << ")\n";
+    }
+    sqlite3_finalize(stmt);
+  }
 }

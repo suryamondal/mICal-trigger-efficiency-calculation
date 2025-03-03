@@ -15,8 +15,8 @@ EXECUTABLE = "build/grouping-and-efficiency"
 # OUTPUT_DIR = "input/corry-input"
 # EXECUTABLE = "build/createTTreeForCorry"
 SPLIT_SIZE = 10000
-MAX_WORKERS = 10
-MAX_FILES = 50
+MAX_WORKERS = 4
+MAX_FILES = 10
 
 class EventCounter:
     def __init__(self):

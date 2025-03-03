@@ -91,6 +91,14 @@ namespace INO {
       return std::tie(module, row, column, layer, side, strip, zone) <
         std::tie(other.module, other.row, other.column, other.layer, other.side, other.strip, other.zone);
     }
+    bool operator!=(const StripletId& other) const {
+      return std::tie(module, row, column, layer, side, strip, zone) !=
+        std::tie(other.module, other.row, other.column, other.layer, other.side, other.strip, other.zone);
+    }
+    bool operator==(const StripletId& other) const {
+      return std::tie(module, row, column, layer, side, strip, zone) ==
+        std::tie(other.module, other.row, other.column, other.layer, other.side, other.strip, other.zone);
+    }
   };
   
   struct Hit {

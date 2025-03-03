@@ -17,6 +17,8 @@ namespace INO {
     void setStripTimeDelay(const StripId& stripId, double time);
     double getStripTimeDelay(const StripId& stripId) const;
     void getLayerPosition(const LayerId& layerId, const int& x, const int& y, TVector3& position, TVector3& orientation) const;
+    void setStripletPosition(const StripletId& stripletId, const TVector3& position, const TVector3& orientation);
+    void getStripletPosition(const StripletId& stripletId, TVector3& position, TVector3& orientation) const;
 
   private:
     INOCalibrationManager();
