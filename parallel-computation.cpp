@@ -186,7 +186,7 @@ void LinearVectorFit(bool              isTime, // time iter
 
 
 // Function to compute something
-double computeFunction(std::vector<INO::PixelId> allPixels, INO::StripletId probeStripletId) {
+double computeFunction(std::vector<INO::PixelId> allPixels, INO::LayerZoneId probeLayerZoneId) {
 
   INO::INOCalibrationManager& inoCalibrationManager = INO::INOCalibrationManager::getInstance();
 
@@ -200,26 +200,21 @@ double computeFunction(std::vector<INO::PixelId> allPixels, INO::StripletId prob
   std::vector<TVector3> exterr;
   pos.clear(); poserr.clear(); occulay.clear();
   for (auto pixel : allPixels) {
-    if (probeStripletId.layer == pixel.layer) continue; // skip the probing layer
-    INO::StripletId stripletId[2];
-    TVector3 stripletPosition[2], stripletOrientation[2];
-    TVector3 pixelPosition[2];
-    for (int nj : {0, 1}) {
-      stripletId[nj] = {
-        pixel.module, pixel.row, pixel.column, pixel.layer,
-        nj, pixel.strip[nj], int(pixel.strip[!nj] / 16)};
-      inoCalibrationManager.getStripletPosition(stripletId[nj], stripletPosition[nj], stripletOrientation[nj]);
-      pixelPosition[nj] = {
-        nj ? 0 : (pixel.strip[nj] + 0.5) * stripWidth,
-        nj ? (pixel.strip[nj] + 0.5) * stripWidth : 0, 0};
-      pixelPosition[nj] += stripletPosition[nj];
-      pixelPosition[nj].RotateX(stripletOrientation[nj].X() * TMath::DegToRad());
-      pixelPosition[nj].RotateY(stripletOrientation[nj].Y() * TMath::DegToRad());
-      pixelPosition[nj].RotateZ(stripletOrientation[nj].Z() * TMath::DegToRad());
-    }
-    TVector3 rawPos = {0, 0, getLayerZ(pixel.layer)};
-    for (int nj : {0, 1})
-      rawPos += pixelPosition[nj];
+    // if (probeLayerZoneId.layer == pixel.layer) continue; // skip the probing layer
+    TVector3 rawPos = {
+      (pixel.strip[0] + 0.5) * stripWidth,
+      (pixel.strip[1] + 0.5) * stripWidth,
+      getLayerZ(pixel.layer)};
+    TVector3 rpcPosition, rpcOrientation;
+    inoCalibrationManager
+      .getLayerPosition({pixel.module, pixel.row, pixel.column, pixel.layer,
+          int(pixel.strip[0] / 16), int(pixel.strip[1] / 16)},
+        rpcPosition, rpcOrientation);
+    rpcPosition.SetZ(0);
+    rawPos += rpcPosition;
+    rawPos.RotateX(rpcOrientation.X() * TMath::DegToRad());
+    rawPos.RotateY(rpcOrientation.Y() * TMath::DegToRad());
+    rawPos.RotateZ(rpcOrientation.Z() * TMath::DegToRad());
     pos.push_back(rawPos);
     poserr.push_back({positionUncertainty, positionUncertainty});
   }
@@ -236,46 +231,41 @@ double computeFunction(std::vector<INO::PixelId> allPixels, INO::StripletId prob
               << std::endl;
 #endif
 
-  double stripResidual = std::numeric_limits<double>::quiet_NaN();
-  for (auto extHit : ext) {
-    int layer = getILayer(extHit.Z());
-    if (probeStripletId.layer != layer) continue; // only the probing layer
-    for (auto pixel : allPixels) {
-      INO::StripletId stripletId[2];
-      for (int nj : {0, 1})
-        stripletId[nj] = {
-          pixel.module, pixel.row, pixel.column, pixel.layer,
-          nj, pixel.strip[nj], int(pixel.strip[!nj] / 16)};
-      if (stripletId[0] != probeStripletId || stripletId[1] != probeStripletId) continue;
+  return chi2.X() + chi2.Y();
 
-      TVector3 stripletPosition[2], stripletOrientation[2];
-      TVector3 pixelPosition[2];
-      for (int nj : {0, 1}) {
-        inoCalibrationManager.getStripletPosition(stripletId[nj], stripletPosition[nj], stripletOrientation[nj]);
-        pixelPosition[nj] = {
-          nj ? 0 : (pixel.strip[nj] + 0.5) * stripWidth,
-          nj ? (pixel.strip[nj] + 0.5) * stripWidth : 0, 0};
-        pixelPosition[nj] += stripletPosition[nj];
-        pixelPosition[nj].RotateX(stripletOrientation[nj].X() * TMath::DegToRad());
-        pixelPosition[nj].RotateY(stripletOrientation[nj].Y() * TMath::DegToRad());
-        pixelPosition[nj].RotateZ(stripletOrientation[nj].Z() * TMath::DegToRad());
-      }
-      TVector3 rawPos = {0, 0, getLayerZ(pixel.layer)};
-      for (int nj : {0, 1})
-        rawPos += pixelPosition[nj];
-      for (int nj : {0, 1})
-        if (stripletId[nj] == probeStripletId)
-          stripResidual = extHit[nj] - rawPos[nj];
-      if (!std::isnan(stripResidual)) break;
-    }
-    if (!std::isnan(stripResidual)) break;
-  }
-
-  return stripResidual;
+  // double stripResidual = std::numeric_limits<double>::quiet_NaN();
+  // for (auto extHit : ext) {
+  //   int layer = getILayer(extHit.Z());
+  //   if (probeLayerZoneId.layer != layer) continue; // only the probing layer
+  //   for (auto pixel : allPixels) {
+  //     if (int(pixel.strip[0] / 16) != probeLayerZoneId.zone[0] ||
+  //         int(pixel.strip[1] / 16) != probeLayerZoneId.zone[1]) continue;
+  //     TVector3 rawPos = {
+  //       (pixel.strip[0] + 0.5) * stripWidth,
+  //       (pixel.strip[1] + 0.5) * stripWidth,
+  //       getLayerZ(pixel.layer)};
+  //     TVector3 rpcPosition, rpcOrientation;
+  //     inoCalibrationManager
+  //       .getLayerPosition({pixel.module, pixel.row, pixel.column, pixel.layer,
+  //           int(pixel.strip[0] / 16), int(pixel.strip[1] / 16)},
+  //         rpcPosition, rpcOrientation);
+  //     rpcPosition.SetZ(0);
+  //     TVector3 newExtPos = extHit;
+  //     newExtPos -= rpcPosition;
+  //     newExtPos.RotateX(-rpcOrientation.X() * TMath::DegToRad());
+  //     newExtPos.RotateY(-rpcOrientation.Y() * TMath::DegToRad());
+  //     newExtPos.RotateZ(-rpcOrientation.Z() * TMath::DegToRad());
+  //     stripResidual = (newExtPos - rawPos).Mag();
+  //     if (!std::isnan(stripResidual)) break;
+  //   }
+  //   if (!std::isnan(stripResidual)) break;
+  // }
+  // return stripResidual;
 }
 
 // Thread worker function
-void worker(std::queue<std::vector<INO::PixelId>>& taskQueue, const INO::StripletId& stripletId,
+void worker(std::queue<std::vector<INO::PixelId>>& taskQueue,
+            const INO::LayerZoneId& layerZoneId,
             std::mutex& queueMutex, std::condition_variable& cv,
             std::vector<double>& results, std::mutex& resultsMutex, bool& done) {
   while (true) {
@@ -287,7 +277,7 @@ void worker(std::queue<std::vector<INO::PixelId>>& taskQueue, const INO::Striple
       task = taskQueue.front();
       taskQueue.pop();
     }
-    double result = computeFunction(task, stripletId);
+    double result = computeFunction(task, layerZoneId);
     {
       std::lock_guard<std::mutex> lock(resultsMutex);
       results.push_back(result);
@@ -317,12 +307,13 @@ int main(int argc, char** argv) {
   for (auto pixels : allPixelsInEvents)
     taskQueue.push(pixels);
 
-  INO::StripletId stripletId = {0, 0, 0, 0, 0, 30, 1};
+  INO::LayerZoneId layerZoneId = {0, 0, 0, 0, 0, 0};
 
   // Create worker threads
   std::vector<std::thread> workers;
   for (unsigned int i = 0; i < maxworker; i++) {
-    workers.emplace_back(worker, std::ref(taskQueue), std::ref(stripletId),
+    workers.emplace_back(worker, std::ref(taskQueue),
+                         std::ref(layerZoneId),
                          std::ref(queueMutex), std::ref(cv), 
                          std::ref(results), std::ref(resultsMutex), std::ref(done));
   }

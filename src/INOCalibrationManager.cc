@@ -128,7 +128,7 @@ double INOCalibrationManager::getStripTimeDelay(const StripId& stripId) const {
 // }
 
 
-void INOCalibrationManager::setLayerPosition(const LayerId& layerId, const int& x, const int& y,
+void INOCalibrationManager::setLayerPosition(const LayerZoneId& layerZoneId,
                                              const TVector3& position, const TVector3& orientation) {
   sqlite3_busy_timeout(db, 5000);
   std::string sql = "INSERT INTO RPCPosition (Module, Row, Column, Layer, "
@@ -137,12 +137,12 @@ void INOCalibrationManager::setLayerPosition(const LayerId& layerId, const int& 
     "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
   sqlite3_stmt* stmt;
   if (sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, nullptr) == SQLITE_OK) {
-    sqlite3_bind_int(stmt, 1, layerId.module);
-    sqlite3_bind_int(stmt, 2, layerId.row);
-    sqlite3_bind_int(stmt, 3, layerId.column);
-    sqlite3_bind_int(stmt, 4, layerId.layer);
-    sqlite3_bind_int(stmt, 5, x);
-    sqlite3_bind_int(stmt, 6, y);
+    sqlite3_bind_int(stmt, 1, layerZoneId.module);
+    sqlite3_bind_int(stmt, 2, layerZoneId.row);
+    sqlite3_bind_int(stmt, 3, layerZoneId.column);
+    sqlite3_bind_int(stmt, 4, layerZoneId.layer);
+    sqlite3_bind_int(stmt, 5, layerZoneId.zone[0]);
+    sqlite3_bind_int(stmt, 6, layerZoneId.zone[1]);
     sqlite3_bind_double(stmt, 7, position.X());
     sqlite3_bind_double(stmt, 8, position.Y());
     sqlite3_bind_double(stmt, 9, position.Z());
@@ -158,7 +158,7 @@ void INOCalibrationManager::setLayerPosition(const LayerId& layerId, const int& 
 }
 
 
-void INOCalibrationManager::getLayerPosition(const LayerId& layerId, const int& x, const int& y,
+void INOCalibrationManager::getLayerPosition(const LayerZoneId& layerZoneId,
                                              TVector3& position, TVector3& orientation) const {
   const char* sql = "SELECT position_x, position_y, position_z, orientation_x, orientation_y, orientation_z "
     "FROM RPCPosition WHERE Module =? AND Row =? AND Column =? AND Layer = ? AND detector_zone_x = ? AND detector_zone_y = ?;";
@@ -166,12 +166,12 @@ void INOCalibrationManager::getLayerPosition(const LayerId& layerId, const int& 
   // Prepare the statement
   if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) == SQLITE_OK) {
     // Bind parameters to the SQL query
-    sqlite3_bind_int(stmt, 1, layerId.module);
-    sqlite3_bind_int(stmt, 2, layerId.row);
-    sqlite3_bind_int(stmt, 3, layerId.column);
-    sqlite3_bind_int(stmt, 4, layerId.layer);
-    sqlite3_bind_int(stmt, 5, x);
-    sqlite3_bind_int(stmt, 6, y);
+    sqlite3_bind_int(stmt, 1, layerZoneId.module);
+    sqlite3_bind_int(stmt, 2, layerZoneId.row);
+    sqlite3_bind_int(stmt, 3, layerZoneId.column);
+    sqlite3_bind_int(stmt, 4, layerZoneId.layer);
+    sqlite3_bind_int(stmt, 5, layerZoneId.zone[0]);
+    sqlite3_bind_int(stmt, 6, layerZoneId.zone[1]);
     // Execute the query and retrieve the result
     if (sqlite3_step(stmt) == SQLITE_ROW) {
       position.SetX(sqlite3_column_double(stmt, 0));

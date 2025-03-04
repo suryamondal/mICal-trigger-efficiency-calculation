@@ -423,9 +423,8 @@ int main(int argc, char** argv) {
         getLayerZ(pixel.layer)};
       TVector3 rpcPosition, rpcOrientation;
       inoCalibrationManager
-        .getLayerPosition({pixel.module, pixel.row, pixel.column, pixel.layer},
-          pixel.strip[0] < 32 ? 0 : 1,
-          pixel.strip[1] < 32 ? 0 : 1,
+        .getLayerPosition({pixel.module, pixel.row, pixel.column, pixel.layer,
+            int(pixel.strip[0] / 16), int(pixel.strip[1] / 16)},
           rpcPosition, rpcOrientation);
       rpcPosition.SetZ(0);
       rawPos += rpcPosition;
@@ -461,9 +460,8 @@ int main(int argc, char** argv) {
           getLayerZ(pixel.layer)};
         TVector3 rpcPosition, rpcOrientation;
         inoCalibrationManager
-          .getLayerPosition({pixel.module, pixel.row, pixel.column, pixel.layer},
-            pixel.strip[0] < 32 ? 0 : 1,
-            pixel.strip[1] < 32 ? 0 : 1,
+          .getLayerPosition({pixel.module, pixel.row, pixel.column, pixel.layer,
+              int(pixel.strip[0] / 16), int(pixel.strip[1] / 16)},
             rpcPosition, rpcOrientation);
         rpcPosition.SetZ(0);
         TVector3 newExtPos = extHit;

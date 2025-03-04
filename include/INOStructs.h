@@ -24,6 +24,29 @@ namespace INO {
     }
   };
 
+  struct LayerZoneId {
+    int module;
+    int row;
+    int column;
+    int layer;
+    int zone[2];
+    // Define operator< for map key comparison
+    bool operator<(const LayerZoneId& other) const {
+      return std::tie(module, row, column, layer, zone[0], zone[1]) <
+        std::tie(other.module, other.row, other.column, other.layer, other.zone[0], other.zone[1]);
+    }
+    // Define operator== for map key comparison
+    bool operator==(const LayerZoneId& other) const {
+      return std::tie(module, row, column, layer, zone[0], zone[1]) ==
+        std::tie(other.module, other.row, other.column, other.layer, other.zone[0], other.zone[1]);
+    }
+    // Define operator!= for map key comparison
+    bool operator!=(const LayerZoneId& other) const {
+      return std::tie(module, row, column, layer, zone[0], zone[1]) !=
+        std::tie(other.module, other.row, other.column, other.layer, other.zone[0], other.zone[1]);
+    }
+  };
+
   struct TDCId {
     int module;
     int row;
