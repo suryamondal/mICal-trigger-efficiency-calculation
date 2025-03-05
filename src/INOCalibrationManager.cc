@@ -131,7 +131,7 @@ double INOCalibrationManager::getStripTimeDelay(const StripId& stripId) const {
 void INOCalibrationManager::setLayerPosition(const LayerZoneId& layerZoneId,
                                              const TVector3& position, const TVector3& orientation) {
   sqlite3_busy_timeout(db, 5000);
-  std::string sql = "INSERT INTO RPCPosition (Module, Row, Column, Layer, "
+  std::string sql = "INSERT OR REPLACE INTO RPCPosition (Module, Row, Column, Layer, "
     "detector_zone_x, detector_zone_y, "
     "position_x, position_y, position_z, orientation_x, orientation_y, orientation_z) "
     "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
@@ -160,6 +160,8 @@ void INOCalibrationManager::setLayerPosition(const LayerZoneId& layerZoneId,
 
 void INOCalibrationManager::getLayerPosition(const LayerZoneId& layerZoneId,
                                              TVector3& position, TVector3& orientation) const {
+  position = {0,0,0};
+  orientation = {0,0,0};;
   const char* sql = "SELECT position_x, position_y, position_z, orientation_x, orientation_y, orientation_z "
     "FROM RPCPosition WHERE Module =? AND Row =? AND Column =? AND Layer = ? AND detector_zone_x = ? AND detector_zone_y = ?;";
   sqlite3_stmt* stmt;

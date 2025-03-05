@@ -199,8 +199,9 @@ double computeFunction(std::vector<INO::PixelId> allPixels, INO::LayerZoneId pro
   std::vector<TVector3> ext;
   std::vector<TVector3> exterr;
   pos.clear(); poserr.clear(); occulay.clear();
+  bool isProbeLayerHasHits = false;
   for (auto pixel : allPixels) {
-    // if (probeLayerZoneId.layer == pixel.layer) continue; // skip the probing layer
+    if (probeLayerZoneId.layer == pixel.layer) isProbeLayerHasHits =  true;
     TVector3 rawPos = {
       (pixel.strip[0] + 0.5) * stripWidth,
       (pixel.strip[1] + 0.5) * stripWidth,
@@ -218,6 +219,8 @@ double computeFunction(std::vector<INO::PixelId> allPixels, INO::LayerZoneId pro
     pos.push_back(rawPos);
     poserr.push_back({positionUncertainty, positionUncertainty});
   }
+  if(!isProbeLayerHasHits) return 0;
+  if (int(pos.size()) < 6) return 0;
   LinearVectorFit(0, pos, poserr, occulay, slope, inter, chi2, ext, exterr);
 
 #ifdef isDebug
@@ -231,7 +234,7 @@ double computeFunction(std::vector<INO::PixelId> allPixels, INO::LayerZoneId pro
               << std::endl;
 #endif
 
-  return chi2.X() + chi2.Y();
+  return (chi2.X() + chi2.Y()) / (int(pos.size()) - 2.0);
 
   // double stripResidual = std::numeric_limits<double>::quiet_NaN();
   // for (auto extHit : ext) {
@@ -285,13 +288,24 @@ void worker(std::queue<std::vector<INO::PixelId>>& taskQueue,
   }
 }
 
-int main(int argc, char** argv) {
 
+void MinimiseTrackChi2(Int_t &npar, Double_t *gin, Double_t& finalResult, Double_t* par, Int_t iflag) {
   // Start timer
   auto start = std::chrono::high_resolution_clock::now();
 
+  INO::INOCalibrationManager& inoCalibrationManager = INO::INOCalibrationManager::getInstance();
+
+  INO::LayerZoneId layerZoneId = {int(par[5]), int(par[6]), int(par[7]), int(par[8]), int(par[9]), int(par[10])};
+  inoCalibrationManager
+    .setLayerPosition(layerZoneId,         // detector to test : fixed
+                      {par[0], par[1], 0}, // position : to minimise
+                      {par[2], par[3], par[4]}); // orientation : to minimise
+  std::cout << " " << par[0] << " " << par[1]
+            << " " << par[2] << " " << par[3] << " " << par[4] << std::endl;
+
   // Number of worker threads
   unsigned int maxworker = std::max(std::thread::hardware_concurrency() - 1, 1u);
+  // unsigned int maxworker = 6;
   std::cout << "Using " << maxworker << " worker threads.\n";
 
   // Task queue and synchronization primitives
@@ -302,25 +316,19 @@ int main(int argc, char** argv) {
   bool done = false;
 
   std::vector<std::vector<INO::PixelId>> allPixelsInEvents;
-  readPixelsFromAllFiles(argv[1], allPixelsInEvents);
+  readPixelsFromAllFiles("output/pixelsBinTemp", allPixelsInEvents);
   // Generate tasks
   for (auto pixels : allPixelsInEvents)
     taskQueue.push(pixels);
-
-  INO::LayerZoneId layerZoneId = {0, 0, 0, 0, 0, 0};
-
   // Create worker threads
   std::vector<std::thread> workers;
-  for (unsigned int i = 0; i < maxworker; i++) {
+  for (unsigned int i = 0; i < maxworker; i++)
     workers.emplace_back(worker, std::ref(taskQueue),
                          std::ref(layerZoneId),
                          std::ref(queueMutex), std::ref(cv), 
                          std::ref(results), std::ref(resultsMutex), std::ref(done));
-  }
-
   // Notify workers that tasks are available
   cv.notify_all();
-
   // Wait for all tasks to be processed
   while (true) {
     std::unique_lock<std::mutex> lock(queueMutex);
@@ -330,23 +338,147 @@ int main(int argc, char** argv) {
       break;
     }
   }
-
   // Join all worker threads
-  for (auto& worker : workers) {
+  for (auto& worker : workers)
     worker.join();
-  }
-
   // Compute final result
-  double finalResult = 0.0;
-  for (double val : results) {
+  finalResult = 0.0;
+  for (double val : results)
     finalResult += val;
-  }
 
   auto end = std::chrono::high_resolution_clock::now();
   std::chrono::duration<double> elapsed = end - start;
 
   std::cout << "Final Result: " << finalResult << std::endl;
   std::cout << "Execution Time: " << elapsed.count() << " seconds" << std::endl;
+}
+
+
+void AlignZone(const INO::LayerZoneId& probeLayerZoneId) {
+
+  TMinuit *gMinuit = new TMinuit(11);  //initialize TMinuit with a maximum of 5 params
+  gMinuit->SetFCN(MinimiseTrackChi2);
+ 
+  double arglist[10];
+  int ierflg = 0;
+ 
+  arglist[0] = 1;
+  gMinuit->mnexcm("SET ERR", arglist, 1, ierflg);
+
+  INO::INOCalibrationManager& inoCalibrationManager = INO::INOCalibrationManager::getInstance();
+  TVector3 rpcPosition, rpcOrientation;
+  inoCalibrationManager
+    .getLayerPosition({probeLayerZoneId.module, probeLayerZoneId.row, probeLayerZoneId.column, probeLayerZoneId.layer,
+        probeLayerZoneId.zone[0], probeLayerZoneId.zone[1]},
+      rpcPosition, rpcOrientation);
+ 
+  // Set starting values and step sizes for parameters
+  gMinuit->mnparm(0, "posx",   rpcPosition.X(),    0.0005, -0.05, 0.05, ierflg);
+  gMinuit->mnparm(1, "posy",   rpcPosition.Y(),    0.0005, -0.05, 0.05, ierflg);
+  gMinuit->mnparm(2, "alpha",  rpcOrientation.X(), 0.1, -5, 5, ierflg);
+  gMinuit->mnparm(3, "beta",   rpcOrientation.Y(), 0.1, -5, 5, ierflg);
+  gMinuit->mnparm(4, "gamma",  rpcOrientation.Z(), 0.1, -5, 5, ierflg);
+  // fixed parameters to pass rpc zone number
+  gMinuit->mnparm(5, "module", probeLayerZoneId.module,  1, 0, 0, ierflg);
+  gMinuit->mnparm(6, "row",    probeLayerZoneId.row,     1, 0, 0, ierflg);
+  gMinuit->mnparm(7, "column", probeLayerZoneId.column,  1, 0, 0, ierflg);
+  gMinuit->mnparm(8, "layer",  probeLayerZoneId.layer,   1, 0, 0, ierflg);
+  gMinuit->mnparm(9, "zonex",  probeLayerZoneId.zone[0], 1, 0, 0, ierflg);
+  gMinuit->mnparm(10, "zoney", probeLayerZoneId.zone[1], 1, 0, 0, ierflg);
+  gMinuit->FixParameter(5);
+  gMinuit->FixParameter(6);
+  gMinuit->FixParameter(7);
+  gMinuit->FixParameter(8);
+  gMinuit->FixParameter(9);
+  gMinuit->FixParameter(10);
+
+  // Now ready for minimization step
+  arglist[0] = 500;
+  arglist[1] = 1.;
+  gMinuit->mnexcm("MIGRAD", arglist ,2,ierflg);
+ 
+  // // Print results
+  // double amin,edm,errdef;
+  // int nvpar,nparx,icstat;
+  // gMinuit->mnstat(amin,edm,errdef,nvpar,nparx,icstat);
+  // //gMinuit->mnprin(3,amin);
+
+  double parresults[5], parerrors[5];
+  for (int ij=0;ij<5;ij++)
+    gMinuit->GetParameter(ij, parresults[ij], parerrors[ij]);
+
+  inoCalibrationManager
+    .setLayerPosition(probeLayerZoneId,    // detector to test : fixed
+                      {parresults[0], parresults[1], 0}, // position : to minimise
+                      {parresults[2], parresults[3], parresults[4]}); // orientation : to minimise
+}
+
+int main(int argc, char** argv) {
+
+  
+  INO::LayerZoneId probeLayerZoneId = {0, 0, 0, 9, 0, 0};
+  AlignZone(probeLayerZoneId);
+
+  // // Start timer
+  // auto start = std::chrono::high_resolution_clock::now();
+
+  // // Number of worker threads
+  // unsigned int maxworker = std::max(std::thread::hardware_concurrency() - 1, 1u);
+  // std::cout << "Using " << maxworker << " worker threads.\n";
+
+  // // Task queue and synchronization primitives
+  // std::queue<std::vector<INO::PixelId>> taskQueue;
+  // std::mutex queueMutex, resultsMutex;
+  // std::condition_variable cv;
+  // std::vector<double> results;
+  // bool done = false;
+
+  // std::vector<std::vector<INO::PixelId>> allPixelsInEvents;
+  // readPixelsFromAllFiles(argv[1], allPixelsInEvents);
+  // // Generate tasks
+  // for (auto pixels : allPixelsInEvents)
+  //   taskQueue.push(pixels);
+
+  // INO::LayerZoneId layerZoneId = {0, 0, 0, 0, 0, 0};
+
+  // // Create worker threads
+  // std::vector<std::thread> workers;
+  // for (unsigned int i = 0; i < maxworker; i++) {
+  //   workers.emplace_back(worker, std::ref(taskQueue),
+  //                        std::ref(layerZoneId),
+  //                        std::ref(queueMutex), std::ref(cv), 
+  //                        std::ref(results), std::ref(resultsMutex), std::ref(done));
+  // }
+
+  // // Notify workers that tasks are available
+  // cv.notify_all();
+
+  // // Wait for all tasks to be processed
+  // while (true) {
+  //   std::unique_lock<std::mutex> lock(queueMutex);
+  //   if (taskQueue.empty()) {
+  //     done = true;
+  //     cv.notify_all();
+  //     break;
+  //   }
+  // }
+
+  // // Join all worker threads
+  // for (auto& worker : workers) {
+  //   worker.join();
+  // }
+
+  // // Compute final result
+  // double finalResult = 0.0;
+  // for (double val : results) {
+  //   finalResult += val;
+  // }
+
+  // auto end = std::chrono::high_resolution_clock::now();
+  // std::chrono::duration<double> elapsed = end - start;
+
+  // std::cout << "Final Result: " << finalResult << std::endl;
+  // std::cout << "Execution Time: " << elapsed.count() << " seconds" << std::endl;
 
   return 0;
 }

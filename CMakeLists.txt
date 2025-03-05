@@ -35,4 +35,4 @@ target_link_libraries(grouping-and-efficiency ROOT::Core ROOT::RIO ROOT::Tree RO
 
 # Add second executable
 add_executable(parallel-computation parallel-computation.cpp ${SOURCES})
-target_link_libraries(parallel-computation pthread ROOT::Core ROOT::RIO ROOT::Tree ROOT::Hist ROOT::Physics SQLite::SQLite3)
+target_link_libraries(parallel-computation pthread ROOT::Core ROOT::RIO ROOT::Tree ROOT::Hist ROOT::Physics SQLite::SQLite3 Minuit)
