@@ -7,7 +7,7 @@ import sys
 import re
 
 # Configuration
-ROOT_DIR = "/media/surya/Surya_1/DaqMadurai/maduraiData_mICAL/SuryaFormat"
+ROOT_DIR = "/media/surya/Surya_HDD_1/DaqMadurai/maduraiData_mICAL/SuryaFormat"
 FILE_REGEX = "SNM_RPC*.root"
 OUTPUT_DIR = "output"
 # EXECUTABLE = "build/time-alignment"

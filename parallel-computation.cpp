@@ -7,8 +7,9 @@
 #include <condition_variable>
 #include <cmath>
 #include <chrono>
+#include <future>
+#include <thread>
 
-#include <iostream>
 #include <fstream>
 #include <iomanip>
 #include <vector>
@@ -201,7 +202,13 @@ double computeFunction(std::vector<INO::PixelId> allPixels, INO::LayerZoneId pro
   pos.clear(); poserr.clear(); occulay.clear();
   bool isProbeLayerHasHits = false;
   for (auto pixel : allPixels) {
-    if (probeLayerZoneId.layer == pixel.layer) isProbeLayerHasHits =  true;
+    bool isProbeLayer = false;
+    if (pixel.layer == probeLayerZoneId.layer &&
+        int(pixel.strip[0] / 16) == probeLayerZoneId.zone[0] &&
+        int(pixel.strip[1] / 16) == probeLayerZoneId.zone[1] ) {
+      isProbeLayerHasHits =  true;
+      isProbeLayer = true;
+    }
     TVector3 rawPos = {
       (pixel.strip[0] + 0.5) * stripWidth,
       (pixel.strip[1] + 0.5) * stripWidth,
@@ -218,6 +225,7 @@ double computeFunction(std::vector<INO::PixelId> allPixels, INO::LayerZoneId pro
     rawPos.RotateZ(rpcOrientation.Z() * TMath::DegToRad());
     pos.push_back(rawPos);
     poserr.push_back({positionUncertainty, positionUncertainty});
+    occulay.push_back(isProbeLayer ? false : true);
   }
   if(!isProbeLayerHasHits) return 0;
   if (int(pos.size()) < 6) return 0;
@@ -234,123 +242,64 @@ double computeFunction(std::vector<INO::PixelId> allPixels, INO::LayerZoneId pro
               << std::endl;
 #endif
 
-  return (chi2.X() + chi2.Y()) / (int(pos.size()) - 2.0);
+  // return (chi2.X() + chi2.Y()) / (int(pos.size()) - 2.0);
 
-  // double stripResidual = std::numeric_limits<double>::quiet_NaN();
-  // for (auto extHit : ext) {
-  //   int layer = getILayer(extHit.Z());
-  //   if (probeLayerZoneId.layer != layer) continue; // only the probing layer
-  //   for (auto pixel : allPixels) {
-  //     if (int(pixel.strip[0] / 16) != probeLayerZoneId.zone[0] ||
-  //         int(pixel.strip[1] / 16) != probeLayerZoneId.zone[1]) continue;
-  //     TVector3 rawPos = {
-  //       (pixel.strip[0] + 0.5) * stripWidth,
-  //       (pixel.strip[1] + 0.5) * stripWidth,
-  //       getLayerZ(pixel.layer)};
-  //     TVector3 rpcPosition, rpcOrientation;
-  //     inoCalibrationManager
-  //       .getLayerPosition({pixel.module, pixel.row, pixel.column, pixel.layer,
-  //           int(pixel.strip[0] / 16), int(pixel.strip[1] / 16)},
-  //         rpcPosition, rpcOrientation);
-  //     rpcPosition.SetZ(0);
-  //     TVector3 newExtPos = extHit;
-  //     newExtPos -= rpcPosition;
-  //     newExtPos.RotateX(-rpcOrientation.X() * TMath::DegToRad());
-  //     newExtPos.RotateY(-rpcOrientation.Y() * TMath::DegToRad());
-  //     newExtPos.RotateZ(-rpcOrientation.Z() * TMath::DegToRad());
-  //     stripResidual = (newExtPos - rawPos).Mag();
-  //     if (!std::isnan(stripResidual)) break;
-  //   }
-  //   if (!std::isnan(stripResidual)) break;
-  // }
-  // return stripResidual;
-}
-
-// Thread worker function
-void worker(std::queue<std::vector<INO::PixelId>>& taskQueue,
-            const INO::LayerZoneId& layerZoneId,
-            std::mutex& queueMutex, std::condition_variable& cv,
-            std::vector<double>& results, std::mutex& resultsMutex, bool& done) {
-  while (true) {
-    std::vector<INO::PixelId> task;
-    {
-      std::unique_lock<std::mutex> lock(queueMutex);
-      cv.wait(lock, [&]() { return !taskQueue.empty() || done; });
-      if (taskQueue.empty() && done) return; // Exit if all tasks are done
-      task = taskQueue.front();
-      taskQueue.pop();
-    }
-    double result = computeFunction(task, layerZoneId);
-    {
-      std::lock_guard<std::mutex> lock(resultsMutex);
-      results.push_back(result);
+  double stripResidual = 0;
+  for (auto extHit : ext) {
+    int layer = getILayer(extHit.Z());
+    if (probeLayerZoneId.layer != layer) continue; // only the probing layer
+    for (auto pixel : allPixels) {
+      if (int(pixel.strip[0] / 16) != probeLayerZoneId.zone[0] ||
+          int(pixel.strip[1] / 16) != probeLayerZoneId.zone[1]) continue;
+      TVector3 rawPos = {
+        (pixel.strip[0] + 0.5) * stripWidth,
+        (pixel.strip[1] + 0.5) * stripWidth,
+        getLayerZ(pixel.layer)};
+      TVector3 rpcPosition, rpcOrientation;
+      inoCalibrationManager
+        .getLayerPosition({pixel.module, pixel.row, pixel.column, pixel.layer,
+            int(pixel.strip[0] / 16), int(pixel.strip[1] / 16)},
+          rpcPosition, rpcOrientation);
+      rpcPosition.SetZ(0);
+      TVector3 newExtPos = extHit;
+      newExtPos -= rpcPosition;
+      newExtPos.RotateX(-rpcOrientation.X() * TMath::DegToRad());
+      newExtPos.RotateY(-rpcOrientation.Y() * TMath::DegToRad());
+      newExtPos.RotateZ(-rpcOrientation.Z() * TMath::DegToRad());
+      double deltaX = TMath::Power(newExtPos.X() - rawPos.X(), 2);
+      double deltaY = TMath::Power(newExtPos.Y() - rawPos.Y(), 2);
+      stripResidual += deltaX + deltaY + TMath::Power(deltaX - deltaY, 2);
     }
   }
+  return stripResidual;
 }
-
 
 void MinimiseTrackChi2(Int_t &npar, Double_t *gin, Double_t& finalResult, Double_t* par, Int_t iflag) {
-  // Start timer
-  auto start = std::chrono::high_resolution_clock::now();
+    // Start timer
+    auto start = std::chrono::high_resolution_clock::now();
 
-  INO::INOCalibrationManager& inoCalibrationManager = INO::INOCalibrationManager::getInstance();
+    INO::INOCalibrationManager& inoCalibrationManager = INO::INOCalibrationManager::getInstance();
+    INO::LayerZoneId layerZoneId = {int(par[5]), int(par[6]), int(par[7]), int(par[8]), int(par[9]), int(par[10])};
 
-  INO::LayerZoneId layerZoneId = {int(par[5]), int(par[6]), int(par[7]), int(par[8]), int(par[9]), int(par[10])};
-  inoCalibrationManager
-    .setLayerPosition(layerZoneId,         // detector to test : fixed
-                      {par[0], par[1], 0}, // position : to minimise
-                      {par[2], par[3], par[4]}); // orientation : to minimise
-  std::cout << " " << par[0] << " " << par[1]
-            << " " << par[2] << " " << par[3] << " " << par[4] << std::endl;
+    inoCalibrationManager.setLayerPosition(layerZoneId, {par[0], par[1], 0}, {par[2], par[3], par[4]});
+    
+    std::cout << " " << par[0] << " " << par[1] << " " << par[2] << " " << par[3] << " " << par[4] << std::endl;
 
-  // Number of worker threads
-  unsigned int maxworker = std::max(std::thread::hardware_concurrency() - 1, 1u);
-  // unsigned int maxworker = 6;
-  std::cout << "Using " << maxworker << " worker threads.\n";
+    std::vector<std::vector<INO::PixelId>> allPixelsInEvents;
+    readPixelsFromAllFiles("output/pixelsBinTemp", allPixelsInEvents);
 
-  // Task queue and synchronization primitives
-  std::queue<std::vector<INO::PixelId>> taskQueue;
-  std::mutex queueMutex, resultsMutex;
-  std::condition_variable cv;
-  std::vector<double> results;
-  bool done = false;
-
-  std::vector<std::vector<INO::PixelId>> allPixelsInEvents;
-  readPixelsFromAllFiles("output/pixelsBinTemp", allPixelsInEvents);
-  // Generate tasks
-  for (auto pixels : allPixelsInEvents)
-    taskQueue.push(pixels);
-  // Create worker threads
-  std::vector<std::thread> workers;
-  for (unsigned int i = 0; i < maxworker; i++)
-    workers.emplace_back(worker, std::ref(taskQueue),
-                         std::ref(layerZoneId),
-                         std::ref(queueMutex), std::ref(cv), 
-                         std::ref(results), std::ref(resultsMutex), std::ref(done));
-  // Notify workers that tasks are available
-  cv.notify_all();
-  // Wait for all tasks to be processed
-  while (true) {
-    std::unique_lock<std::mutex> lock(queueMutex);
-    if (taskQueue.empty()) {
-      done = true;
-      cv.notify_all();
-      break;
+    // Launch tasks asynchronously
+    finalResult = 0.0;
+    for (auto& pixels : allPixelsInEvents) {
+      finalResult += computeFunction(pixels, layerZoneId);
     }
-  }
-  // Join all worker threads
-  for (auto& worker : workers)
-    worker.join();
-  // Compute final result
-  finalResult = 0.0;
-  for (double val : results)
-    finalResult += val;
 
-  auto end = std::chrono::high_resolution_clock::now();
-  std::chrono::duration<double> elapsed = end - start;
+    // End timer
+    auto end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> elapsed = end - start;
 
-  std::cout << "Final Result: " << finalResult << std::endl;
-  std::cout << "Execution Time: " << elapsed.count() << " seconds" << std::endl;
+    std::cout << "Final Result: " << std::setprecision(10) << finalResult << std::endl;
+    std::cout << "Execution Time: " << elapsed.count() << " seconds" << std::endl;
 }
 
 
@@ -362,22 +311,28 @@ void AlignZone(const INO::LayerZoneId& probeLayerZoneId) {
   double arglist[10];
   int ierflg = 0;
  
-  arglist[0] = 1;
-  gMinuit->mnexcm("SET ERR", arglist, 1, ierflg);
+  // arglist[0] = 1;
+  // gMinuit->mnexcm("SET ERR", arglist, 1, ierflg);
 
   INO::INOCalibrationManager& inoCalibrationManager = INO::INOCalibrationManager::getInstance();
-  TVector3 rpcPosition, rpcOrientation;
-  inoCalibrationManager
-    .getLayerPosition({probeLayerZoneId.module, probeLayerZoneId.row, probeLayerZoneId.column, probeLayerZoneId.layer,
-        probeLayerZoneId.zone[0], probeLayerZoneId.zone[1]},
-      rpcPosition, rpcOrientation);
+  TVector3 rpcPosition = {0,0,0}, rpcOrientation = {0,0,0};
+  // inoCalibrationManager
+  //   .getLayerPosition({probeLayerZoneId.module, probeLayerZoneId.row, probeLayerZoneId.column, probeLayerZoneId.layer,
+  //       probeLayerZoneId.zone[0], probeLayerZoneId.zone[1]},
+  //     rpcPosition, rpcOrientation);
  
   // Set starting values and step sizes for parameters
-  gMinuit->mnparm(0, "posx",   rpcPosition.X(),    0.0005, -0.05, 0.05, ierflg);
-  gMinuit->mnparm(1, "posy",   rpcPosition.Y(),    0.0005, -0.05, 0.05, ierflg);
-  gMinuit->mnparm(2, "alpha",  rpcOrientation.X(), 0.1, -5, 5, ierflg);
-  gMinuit->mnparm(3, "beta",   rpcOrientation.Y(), 0.1, -5, 5, ierflg);
-  gMinuit->mnparm(4, "gamma",  rpcOrientation.Z(), 0.1, -5, 5, ierflg);
+  gMinuit->mnparm(0, "posx",   rpcPosition.X(),    0.0005, -0.1, 0.1, ierflg);
+  gMinuit->mnparm(1, "posy",   rpcPosition.Y(),    0.0005, -0.1, 0.1, ierflg);
+  gMinuit->mnparm(2, "alpha",  rpcOrientation.X(), 0.1, -10, 10, ierflg);
+  gMinuit->mnparm(3, "beta",   rpcOrientation.Y(), 0.1, -10, 10, ierflg);
+  gMinuit->mnparm(4, "gamma",  rpcOrientation.Z(), 0.1, -10, 10, ierflg);
+  // gMinuit->mnparm(2, "alpha",  0, 0.1, -5, 5, ierflg);
+  // gMinuit->mnparm(3, "beta",   0, 0.1, -5, 5, ierflg);
+  // gMinuit->mnparm(4, "gamma",  0, 0.1, -5, 5, ierflg);
+  // gMinuit->FixParameter(2);
+  // gMinuit->FixParameter(3);
+  gMinuit->FixParameter(4);
   // fixed parameters to pass rpc zone number
   gMinuit->mnparm(5, "module", probeLayerZoneId.module,  1, 0, 0, ierflg);
   gMinuit->mnparm(6, "row",    probeLayerZoneId.row,     1, 0, 0, ierflg);
@@ -392,10 +347,14 @@ void AlignZone(const INO::LayerZoneId& probeLayerZoneId) {
   gMinuit->FixParameter(9);
   gMinuit->FixParameter(10);
 
-  // Now ready for minimization step
-  arglist[0] = 500;
-  arglist[1] = 1.;
-  gMinuit->mnexcm("MIGRAD", arglist ,2,ierflg);
+  gMinuit->Command("SET STR 0");
+
+  gMinuit->Migrad();
+
+  // // Now ready for minimization step
+  // arglist[0] = 500;
+  // arglist[1] = 1.;
+  // gMinuit->mnexcm("MIGRAD", arglist ,2,ierflg);
  
   // // Print results
   // double amin,edm,errdef;
@@ -415,8 +374,7 @@ void AlignZone(const INO::LayerZoneId& probeLayerZoneId) {
 
 int main(int argc, char** argv) {
 
-  
-  INO::LayerZoneId probeLayerZoneId = {0, 0, 0, 9, 0, 0};
+  INO::LayerZoneId probeLayerZoneId = {0, 0, 0, std::stoi(argv[1]), std::stoi(argv[2]), std::stoi(argv[3])};
   AlignZone(probeLayerZoneId);
 
   // // Start timer

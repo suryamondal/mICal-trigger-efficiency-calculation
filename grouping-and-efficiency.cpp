@@ -1,7 +1,7 @@
 
 
 // #define isDebug
-// #define storePixels
+#define storePixels
 
 #include <iostream>
 #include <fstream>
